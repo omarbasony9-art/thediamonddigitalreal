@@ -9,9 +9,9 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, RefreshCw, Settings, Plus, Trash2, FileCode,
-  Copy, AlertTriangle, ChevronRight, Sparkles, Send, Loader2,
+  Copy, ChevronRight, Sparkles, Send, Loader2,
   Globe, CheckCircle2, ExternalLink, Eye, EyeOff, RotateCcw,
-  FileJson, FileCog, File,
+  FileJson, FileCog, File, Rocket, Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,16 +47,31 @@ function FileIcon({ slug, className = "w-3.5 h-3.5" }: { slug: string; className
  * Build preview doc by inlining CSS and JS into the HTML.
  * Uses the editMap (in-memory unsaved edits) over DB content so switching
  * tabs never loses edits from other files in the live preview.
+ * Injects a navigation interceptor so clicking <a href="page.html"> sends
+ * a postMessage to the parent instead of blanking the iframe.
  */
-const buildPreview = (files: FileItem[], editMap: Map<number, string>) => {
+const buildPreview = (files: FileItem[], editMap: Map<number, string>, pageSlug?: string) => {
   const resolve = (f: FileItem) => editMap.has(f.id) ? editMap.get(f.id)! : f.content;
-  const html = files.find((f) => f.slug === "index.html") || files.find((f) => f.slug.endsWith(".html"));
+  const html = (pageSlug ? files.find((f) => f.slug === pageSlug) : null)
+    || files.find((f) => f.slug === "index.html")
+    || files.find((f) => f.slug.endsWith(".html"));
   if (!html) return `<html><body style="font:14px system-ui;color:#666;padding:48px;text-align:center;background:#111"><p>No HTML file yet. Ask AI to build your site.</p></body></html>`;
   let doc = resolve(html);
   const styles = files.filter((f) => f.slug.endsWith(".css")).map((f) => `<style>${resolve(f)}</style>`).join("\n");
   const scripts = files.filter((f) => f.slug.endsWith(".js")).map((f) => `<script>${resolve(f)}<\/script>`).join("\n");
+  // Intercept internal link clicks so navigation works in the sandboxed preview
+  const navInterceptor = `<script>
+document.addEventListener('click',function(e){
+  var a=e.target.closest('a');if(!a)return;
+  var href=a.getAttribute('href');
+  if(href&&!href.startsWith('http')&&!href.startsWith('#')&&!href.startsWith('mailto:')&&!href.startsWith('tel:')){
+    e.preventDefault();
+    window.parent.postMessage({type:'preview-navigate',page:href},'*');
+  }
+});
+<\/script>`;
   doc = doc.includes("</head>") ? doc.replace("</head>", `${styles}\n</head>`) : styles + doc;
-  doc = doc.includes("</body>") ? doc.replace("</body>", `${scripts}\n</body>`) : doc + scripts;
+  doc = doc.includes("</body>") ? doc.replace("</body>", `${navInterceptor}\n${scripts}\n</body>`) : doc + navInterceptor + scripts;
   return doc;
 };
 
@@ -118,12 +133,14 @@ export default function SiteBuilder() {
   const [activeFileId, setActiveFileId] = useState<number | null>(null);
   const [previewDoc, setPreviewDoc] = useState("");
   const [previewKey, setPreviewKey] = useState(0);
+  const [previewPage, setPreviewPage] = useState("index.html");
   const [addingFile, setAddingFile] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [publishOpen, setPublishOpen] = useState(false);
-  const [publishStep, setPublishStep] = useState<"domain" | "live">("domain");
+  const [deployOpen, setDeployOpen] = useState(false);
+  const [deployTab, setDeployTab] = useState<"quick" | "domain">("quick");
+  const [deployStep, setDeployStep] = useState<"form" | "live">("form");
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [domainInput, setDomainInput] = useState("");
   const [platformDomain, setPlatformDomain] = useState("");
@@ -182,23 +199,42 @@ export default function SiteBuilder() {
     if (!pages) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current));
+      setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current, previewPage));
     }, 400);
     return () => clearTimeout(debounceRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMapVersion, pages]);
+  }, [editMapVersion, pages, previewPage]);
 
   // When pages first arrive (or DB refreshes), set initial preview immediately
   useEffect(() => {
     if (pages && pages.length > 0) {
-      setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current));
+      setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current, previewPage));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pages]);
+
+  // Intercept in-preview link clicks — swap the rendered page instead of blanking
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== "preview-navigate") return;
+      const target: string = e.data.page || "index.html";
+      const slug = target.split("/").pop() || target; // strip any path prefix
+      const file = pagesRef.current?.find((p) => p.slug === slug);
+      if (file) {
+        setPreviewPage(slug);
+        setPreviewDoc(buildPreview(pagesRef.current as FileItem[], editMapRef.current, slug));
+        setPreviewKey((k) => k + 1);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
 
   useEffect(() => {
-    if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
+    if (site?.liveUrl) setPublishedUrl(site.liveUrl);
+    else if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
   }, [site]);
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
@@ -246,17 +282,17 @@ export default function SiteBuilder() {
     await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
     // After save, rebuild preview with latest
     const fresh = pagesRef.current;
-    if (fresh) setPreviewDoc(buildPreview(fresh as FileItem[], editMapRef.current));
+    if (fresh) setPreviewDoc(buildPreview(fresh as FileItem[], editMapRef.current, previewPage));
     setPreviewKey((k) => k + 1);
     toast({ title: `Saved ${dirty.length} file${dirty.length > 1 ? "s" : ""} ✓` });
   }, [pages, id, updatePage, queryClient, toast]);
 
-  const openPublishDialog = async () => {
-    // Pre-fill domain from existing site data if already linked
+  const openDeployDialog = async () => {
     const existingDomain = site?.domain && !site.domain.startsWith("http") ? site.domain : "";
     setDomainInput(existingDomain);
-    setPublishStep("domain");
-    setPublishOpen(true);
+    setDeployStep("form");
+    setDeployTab(existingDomain ? "domain" : "quick");
+    setDeployOpen(true);
     // Fetch platform domain for CNAME instructions
     try {
       const token = localStorage.getItem("admin_token");
@@ -268,22 +304,22 @@ export default function SiteBuilder() {
     } catch { /* non-critical */ }
   };
 
-  const handlePublish = async () => {
+  const handlePublish = async (useCustomDomain: boolean) => {
     setPublishing(true);
     try {
       const token = localStorage.getItem("admin_token");
       const res = await fetch(`${import.meta.env.BASE_URL}api/sites/${id}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ customDomain: domainInput.trim() }),
+        body: JSON.stringify({ customDomain: useCustomDomain ? domainInput.trim() : "" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Publish failed");
+      if (!res.ok) throw new Error(data.error || "Deploy failed");
       setPublishedUrl(data.publishedUrl);
-      setPublishStep("live");
+      setDeployStep("live");
       queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
     } catch (err: any) {
-      toast({ title: "Publish failed", description: err.message, variant: "destructive" });
+      toast({ title: "Deploy failed", description: err.message, variant: "destructive" });
     } finally {
       setPublishing(false);
     }
@@ -466,17 +502,10 @@ export default function SiteBuilder() {
             {updatePage.isPending ? "Saving…" : "Save All"}
           </button>
         )}
-        {isLive && site?.liveUrl ? (
-          <button onClick={openPublishDialog}
-            className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded hover:bg-emerald-600/30 transition-colors">
-            <Globe className="w-3 h-3" /> Live ↗
-          </button>
-        ) : (
-          <button onClick={openPublishDialog}
-            className="flex items-center gap-1.5 px-3 h-7 bg-[#0066ff] hover:bg-[#0052cc] text-white text-xs font-mono font-bold rounded transition-colors">
-            <Globe className="w-3 h-3" />Publish
-          </button>
-        )}
+        <button onClick={openDeployDialog}
+          className={`flex items-center gap-1.5 px-3 h-7 text-xs font-mono font-bold rounded transition-colors ${isLive ? "bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30" : "bg-[#0066ff] hover:bg-[#0052cc] text-white"}`}>
+          <Rocket className="w-3 h-3" />{isLive ? "Live ↗" : "Deploy"}
+        </button>
       </div>
 
       {/* ── WORKSPACE ── */}
@@ -583,25 +612,45 @@ export default function SiteBuilder() {
             {/* Live preview */}
             {showPreview && (
               <div className="w-1/2 flex flex-col overflow-hidden">
+                {/* Browser chrome bar */}
                 <div className="h-8 bg-[#1a1a1a] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5 shrink-0">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]/60" />
                     <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]/60" />
                     <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/60" />
                   </div>
-                  <div className="flex-1 mx-2 bg-[#0e0e0e] rounded text-[10px] font-mono text-white/20 px-2 py-0.5 truncate">
-                    {publishedUrl || "preview"}
+                  <div className="flex-1 mx-2 bg-[#0e0e0e] rounded text-[10px] font-mono text-white/30 px-2 py-0.5 truncate">
+                    {publishedUrl ? `${publishedUrl}/${previewPage === "index.html" ? "" : previewPage}` : previewPage}
                   </div>
                   <button
                     onClick={() => {
-                      if (pages) setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current));
+                      if (pages) setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current, previewPage));
                       setPreviewKey((k) => k + 1);
                     }}
-                    className="text-white/20 hover:text-white/50 transition-colors"
+                    className="text-white/20 hover:text-white/50 transition-colors shrink-0"
                   >
                     <RefreshCw className="w-3 h-3" />
                   </button>
                 </div>
+                {/* Page navigation tabs — only show when there are multiple HTML files */}
+                {(pages?.filter((p) => p.slug.endsWith(".html")).length ?? 0) > 1 && (
+                  <div className="flex items-center overflow-x-auto bg-[#111] border-b border-white/5 shrink-0 px-2 gap-1 py-1">
+                    {pages?.filter((p) => p.slug.endsWith(".html")).map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setPreviewPage(p.slug);
+                          setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current, p.slug));
+                          setPreviewKey((k) => k + 1);
+                        }}
+                        className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-mono shrink-0 transition-colors ${previewPage === p.slug ? "bg-[#0066ff] text-white" : "text-white/30 hover:text-white/60 hover:bg-white/6"}`}
+                      >
+                        <Globe className="w-2.5 h-2.5 opacity-60" />
+                        {p.slug}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {/* key only changes on explicit refresh — avoids flicker on every keystroke */}
                 <iframe
                   key={previewKey}
@@ -688,120 +737,171 @@ export default function SiteBuilder() {
         <span className="hidden sm:inline">Ctrl+S to save all</span>
       </div>
 
-      {/* PUBLISH DIALOG */}
-      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
-        <DialogContent className="sm:max-w-md bg-[#1a1a1a] border-white/10 rounded-xl text-white">
+      {/* ── DEPLOY DIALOG ── */}
+      <Dialog open={deployOpen} onOpenChange={setDeployOpen}>
+        <DialogContent className="sm:max-w-md bg-[#1a1a1a] border-white/10 rounded-xl text-white p-0 overflow-hidden">
 
-          {/* ── STEP 1: Link a domain ── */}
-          {publishStep === "domain" && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Globe className="w-4 h-4 text-[#0066ff]" />
-                  Link a Domain & Publish
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-5 pt-1">
-                {/* Domain input */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-white/50">Client's domain</label>
-                  <div className="flex items-center gap-0 bg-black/30 border border-white/10 focus-within:border-[#0066ff]/60 rounded-lg overflow-hidden transition-colors">
-                    <span className="px-3 text-xs font-mono text-white/30 bg-white/4 border-r border-white/8 h-10 flex items-center shrink-0">https://</span>
-                    <input
-                      type="text"
-                      value={domainInput}
-                      onChange={(e) => setDomainInput(e.target.value.replace(/^https?:\/\//i, ""))}
-                      onKeyDown={(e) => { if (e.key === "Enter" && domainInput.trim()) handlePublish(); }}
-                      placeholder="myclient.com"
-                      className="flex-1 bg-transparent px-3 py-2.5 text-sm font-mono text-white placeholder:text-white/25 focus:outline-none"
-                    />
-                  </div>
+          {/* ── SUCCESS SCREEN ── */}
+          {deployStep === "live" ? (
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                 </div>
-
-                {/* DNS instructions */}
-                <div className="space-y-2">
-                  <p className="text-xs font-mono text-white/40 uppercase tracking-wider">DNS setup — point your domain here</p>
-                  <div className="bg-black/40 border border-white/8 rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-3 border-b border-white/6 text-[10px] font-mono text-white/30 px-3 py-1.5 bg-white/3">
-                      <span>TYPE</span><span>NAME</span><span>VALUE</span>
-                    </div>
-                    <div className="grid grid-cols-3 px-3 py-2.5 text-xs font-mono">
-                      <span className="text-amber-400">CNAME</span>
-                      <span className="text-white/60">@</span>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-emerald-400 truncate">{platformDomain || "your-platform-domain"}</span>
-                        {platformDomain && (
-                          <button onClick={() => { navigator.clipboard.writeText(platformDomain); toast({ title: "Copied!" }); }}
-                            className="text-white/20 hover:text-white/60 shrink-0 transition-colors">
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-white/25 leading-relaxed">
-                    Add this record in your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.). DNS can take up to 48 hours to propagate.
-                  </p>
-                </div>
-
-                <div className="flex gap-3 pt-1">
-                  <Button variant="outline" onClick={() => setPublishOpen(false)}
-                    className="flex-1 border-white/10 text-white/50 hover:text-white rounded-lg font-mono text-xs h-9">
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handlePublish}
-                    disabled={publishing || !domainInput.trim()}
-                    className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-40 text-white rounded-lg font-mono text-xs h-9">
-                    {publishing
-                      ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Publishing…</>
-                      : <><Globe className="w-3.5 h-3.5 mr-1.5" />Publish to {domainInput.trim() || "domain"}</>}
-                  </Button>
+                <div>
+                  <p className="font-semibold text-white">Site is live!</p>
+                  <p className="text-xs text-white/40 font-mono">Deployed successfully</p>
                 </div>
               </div>
-            </>
-          )}
+              <div className="flex items-center gap-2 bg-black/40 border border-white/8 rounded-lg px-3 py-2.5">
+                <Globe className="w-4 h-4 text-[#0066ff] shrink-0" />
+                <span className="flex-1 text-sm font-mono text-blue-300 truncate">{publishedUrl}</span>
+                <button onClick={() => { if (publishedUrl) { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); } }}
+                  className="text-white/30 hover:text-white transition-colors shrink-0">
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+              {deployTab === "domain" && platformDomain && domainInput && (
+                <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg p-3">
+                  <p className="text-xs font-mono text-amber-400/80 font-semibold mb-1">DNS reminder</p>
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    CNAME <span className="text-white/60 font-mono">{domainInput}</span> → <span className="text-emerald-400 font-mono">{platformDomain}</span>
+                  </p>
+                </div>
+              )}
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" onClick={() => setDeployOpen(false)}
+                  className="flex-1 border-white/10 text-white/60 hover:text-white rounded-lg font-mono text-xs">
+                  Close
+                </Button>
+                <Button onClick={() => window.open(publishedUrl!, "_blank")}
+                  className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] text-white rounded-lg font-mono text-xs">
+                  <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Site
+                </Button>
+              </div>
+              <p className="text-[10px] text-white/20 font-mono text-center">Deploy again anytime to push new changes.</p>
+            </div>
 
-          {/* ── STEP 2: Success ── */}
-          {publishStep === "live" && (
+          ) : (
             <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  Site Published!
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-1">
-                <p className="text-sm text-white/50">Your site is published at:</p>
-                <div className="flex items-center gap-2 bg-black/30 border border-white/8 rounded-lg px-3 py-2.5">
-                  <Globe className="w-4 h-4 text-[#0066ff] shrink-0" />
-                  <span className="flex-1 text-sm font-mono text-blue-300 truncate">{publishedUrl}</span>
-                  <button onClick={() => { if (publishedUrl) { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); } }}
-                    className="text-white/30 hover:text-white transition-colors shrink-0">
-                    <Copy className="w-4 h-4" />
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b border-white/6">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2.5 text-base font-semibold">
+                    <div className="w-8 h-8 rounded-lg bg-[#0066ff]/15 border border-[#0066ff]/25 flex items-center justify-center">
+                      <Rocket className="w-4 h-4 text-[#0066ff]" />
+                    </div>
+                    Deploy Site
+                  </DialogTitle>
+                </DialogHeader>
+
+                {/* Tab switcher */}
+                <div className="flex gap-1 mt-4 bg-black/30 rounded-lg p-1">
+                  <button
+                    onClick={() => setDeployTab("quick")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-mono transition-colors ${deployTab === "quick" ? "bg-[#0066ff] text-white" : "text-white/40 hover:text-white/70"}`}
+                  >
+                    <Rocket className="w-3 h-3" /> Quick Deploy
+                  </button>
+                  <button
+                    onClick={() => setDeployTab("domain")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-mono transition-colors ${deployTab === "domain" ? "bg-[#0066ff] text-white" : "text-white/40 hover:text-white/70"}`}
+                  >
+                    <Link2 className="w-3 h-3" /> Custom Domain
                   </button>
                 </div>
+              </div>
 
-                {platformDomain && (
-                  <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg p-3 space-y-1">
-                    <p className="text-xs font-mono text-amber-400/80 font-semibold">DNS reminder</p>
-                    <p className="text-[11px] text-white/40 leading-relaxed">
-                      Make sure your CNAME record points <span className="text-white/60 font-mono">{domainInput}</span> → <span className="text-emerald-400 font-mono">{platformDomain}</span>
-                    </p>
-                  </div>
+              {/* Tab content */}
+              <div className="p-6 space-y-5">
+
+                {/* ── QUICK DEPLOY TAB ── */}
+                {deployTab === "quick" && (
+                  <>
+                    <div className="bg-[#0066ff]/8 border border-[#0066ff]/20 rounded-lg p-4 space-y-2">
+                      <p className="text-sm font-semibold text-white">Deploy instantly</p>
+                      <p className="text-xs text-white/50 leading-relaxed">
+                        Go live right now on the platform's URL — no DNS setup needed. Share the link with your client immediately.
+                      </p>
+                      {publishedUrl && (
+                        <div className="flex items-center gap-2 bg-black/30 border border-white/8 rounded-md px-2.5 py-1.5 mt-2">
+                          <Globe className="w-3 h-3 text-[#0066ff] shrink-0" />
+                          <span className="flex-1 text-[11px] font-mono text-blue-300 truncate">{publishedUrl}</span>
+                          <button onClick={() => { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); }}
+                            className="text-white/30 hover:text-white shrink-0 transition-colors">
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={() => setDeployOpen(false)}
+                        className="flex-1 border-white/10 text-white/50 hover:text-white rounded-lg font-mono text-xs h-9">
+                        Cancel
+                      </Button>
+                      <Button onClick={() => handlePublish(false)} disabled={publishing}
+                        className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-40 text-white rounded-lg font-mono text-xs h-9 font-bold">
+                        {publishing
+                          ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Deploying…</>
+                          : <><Rocket className="w-3.5 h-3.5 mr-1.5" />Deploy Now</>}
+                      </Button>
+                    </div>
+                  </>
                 )}
 
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setPublishOpen(false)}
-                    className="flex-1 border-white/10 text-white/60 hover:text-white rounded-lg font-mono text-xs">
-                    Close
-                  </Button>
-                  <Button onClick={() => window.open(publishedUrl!, "_blank")}
-                    className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] text-white rounded-lg font-mono text-xs">
-                    <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Site
-                  </Button>
-                </div>
-                <p className="text-[10px] text-white/20 font-mono text-center">Republish anytime to push new changes to the live site.</p>
+                {/* ── CUSTOM DOMAIN TAB ── */}
+                {deployTab === "domain" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-mono text-white/50">Client's custom domain</label>
+                      <div className="flex items-center bg-black/30 border border-white/10 focus-within:border-[#0066ff]/60 rounded-lg overflow-hidden transition-colors">
+                        <span className="px-3 text-xs font-mono text-white/30 bg-white/4 border-r border-white/8 h-10 flex items-center shrink-0">https://</span>
+                        <input
+                          type="text"
+                          value={domainInput}
+                          onChange={(e) => setDomainInput(e.target.value.replace(/^https?:\/\//i, ""))}
+                          onKeyDown={(e) => { if (e.key === "Enter" && domainInput.trim()) handlePublish(true); }}
+                          placeholder="myclient.com"
+                          className="flex-1 bg-transparent px-3 py-2.5 text-sm font-mono text-white placeholder:text-white/25 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-mono text-white/35 uppercase tracking-wider">DNS record to add</p>
+                      <div className="bg-black/40 border border-white/8 rounded-lg overflow-hidden">
+                        <div className="grid grid-cols-3 border-b border-white/6 text-[10px] font-mono text-white/25 px-3 py-1.5 bg-white/2">
+                          <span>TYPE</span><span>NAME</span><span>VALUE</span>
+                        </div>
+                        <div className="grid grid-cols-3 px-3 py-2.5 text-xs font-mono">
+                          <span className="text-amber-400">CNAME</span>
+                          <span className="text-white/50">@</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-emerald-400 truncate">{platformDomain || "softwarediamond.com"}</span>
+                            {platformDomain && (
+                              <button onClick={() => { navigator.clipboard.writeText(platformDomain); toast({ title: "Copied!" }); }}
+                                className="text-white/20 hover:text-white/60 shrink-0 transition-colors">
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-white/25 leading-relaxed">GoDaddy, Namecheap, Cloudflare — add this record then click Deploy. DNS can take up to 48 hours.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={() => setDeployOpen(false)}
+                        className="flex-1 border-white/10 text-white/50 hover:text-white rounded-lg font-mono text-xs h-9">
+                        Cancel
+                      </Button>
+                      <Button onClick={() => handlePublish(true)} disabled={publishing || !domainInput.trim()}
+                        className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-40 text-white rounded-lg font-mono text-xs h-9 font-bold">
+                        {publishing
+                          ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Deploying…</>
+                          : <><Globe className="w-3.5 h-3.5 mr-1.5" />Deploy to {domainInput.trim() || "domain"}</>}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
