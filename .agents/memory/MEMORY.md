@@ -1,2 +1,3 @@
 - [Admin auth system](admin-auth.md) — Clerk replaced with custom JWT for admin routes; single admin account in admin_users table
+- [AI model token budget](ai-model-token-budget.md) — gpt-5.6-terra is a reasoning model; needs max_completion_tokens ≥ 32000 or returns empty content
 - [Site builder IDE](site-builder-ide.md) — Monaco editor + live iframe preview; starter files auto-seeded from STARTERS array when site has no pages

@@ -60,7 +60,7 @@ router.post("/admin/ai/generate", requireAdminAuth, async (req: any, res: any): 
 
     const response = await openai.chat.completions.create({
       model: "gpt-5.6-terra",
-      max_completion_tokens: 8192,
+      max_completion_tokens: 32000,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
