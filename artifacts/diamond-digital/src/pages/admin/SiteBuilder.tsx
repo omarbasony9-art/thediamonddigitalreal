@@ -22,13 +22,91 @@ import { useToast } from "@/hooks/use-toast";
 
 type FileItem = { id: number; title: string; slug: string; content: string; order: number };
 
-type AttachedImage = { dataUrl: string; name: string; id: string };
+type AttachedFile = {
+  id: string;
+  name: string;        // display label shown in the UI
+  originalName: string;
+  dataUrl: string;     // base64 JPEG for images & video frames; empty for audio
+  fileType: "image" | "video" | "audio" | "other";
+};
 
 // History entry for multi-turn context sent to the API
 type HistoryEntry = { role: "user" | "assistant"; content: string };
 
+// ─── File Processing Utilities ────────────────────────────────────────────────
+
+/** Compress & resize an image to max 1024px, JPEG 85%. Returns a base64 data URL. */
+const compressImage = (file: File, maxPx = 1024, quality = 0.85): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(maxPx / img.width, maxPx / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+    img.src = url;
+  });
+
+/** Extract a representative frame from a video file. Returns a compressed base64 JPEG. */
+const extractVideoFrame = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    video.muted = true;
+    video.playsInline = true;
+    const cleanup = () => URL.revokeObjectURL(url);
+    video.onloadedmetadata = () => {
+      // Seek to ~10% in or 1s, whichever is less
+      video.currentTime = Math.min(video.duration * 0.1, 1);
+    };
+    video.onseeked = () => {
+      try {
+        const maxPx = 1024;
+        const scale = Math.min(maxPx / video.videoWidth, maxPx / video.videoHeight, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        canvas.getContext("2d")!.drawImage(video, 0, 0, canvas.width, canvas.height);
+        cleanup();
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      } catch (e) { cleanup(); reject(e); }
+    };
+    video.onerror = () => { cleanup(); reject(new Error("Video load failed")); };
+    video.load();
+  });
+
+/** Turn any dropped/selected file into an AttachedFile, handling image/video/audio/other. */
+const processAttachedFile = async (file: File): Promise<AttachedFile> => {
+  const id = crypto.randomUUID();
+  const { name, type } = file;
+
+  if (type.startsWith("image/")) {
+    const dataUrl = await compressImage(file);
+    return { id, name, originalName: name, dataUrl, fileType: "image" };
+  }
+
+  if (type.startsWith("video/")) {
+    const dataUrl = await extractVideoFrame(file);
+    return { id, name: `🎬 ${name}`, originalName: name, dataUrl, fileType: "video" };
+  }
+
+  if (type.startsWith("audio/")) {
+    // Can't send audio to vision model — represent as a text note
+    return { id, name: `🎙️ ${name}`, originalName: name, dataUrl: "", fileType: "audio" };
+  }
+
+  return { id, name, originalName: name, dataUrl: "", fileType: "other" };
+};
+
 type AiMsg =
-  | { role: "user"; text: string; images?: AttachedImage[] }
+  | { role: "user"; text: string; images?: AttachedFile[] }
   | { role: "assistant"; text: string; mode: "chat" | "build"; files?: string[] }
   | { role: "thinking" }
   | { role: "queued"; text: string; position: number }
@@ -226,10 +304,11 @@ export default function SiteBuilder() {
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [queueLength, setQueueLength] = useState(0);
-  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const conversationHistoryRef = useRef<HistoryEntry[]>([]);
-  const messageQueueRef = useRef<{ text: string; images: AttachedImage[] }[]>([]);
+  const messageQueueRef = useRef<{ text: string; files: AttachedFile[] }[]>([]);
   const aiLoadingRef = useRef(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<typeof pages>(undefined);
@@ -351,23 +430,18 @@ export default function SiteBuilder() {
     toast({ title: `Saved ${dirty.length} file${dirty.length > 1 ? "s" : ""} ✓` });
   }, [pages, id, updatePage, queryClient, toast]);
 
-  // ── Image attachment ────────────────────────────────────────────────────────
-
-  const readImageFile = (file: File): Promise<AttachedImage> =>
-    new Promise((resolve, reject) => {
-      if (!file.type.startsWith("image/")) { reject(new Error("Not an image")); return; }
-      const reader = new FileReader();
-      reader.onload = () =>
-        resolve({ dataUrl: reader.result as string, name: file.name, id: crypto.randomUUID() });
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  // ── File attachment (images, videos, audio) ─────────────────────────────────
 
   const attachFiles = async (files: FileList | File[]) => {
     const arr = Array.from(files);
-    const imgs = await Promise.allSettled(arr.map(readImageFile));
-    const good = imgs.filter((r): r is PromiseFulfilledResult<AttachedImage> => r.status === "fulfilled").map((r) => r.value);
-    if (good.length) setAttachedImages((prev) => [...prev, ...good]);
+    if (!arr.length) return;
+    setIsProcessing(true);
+    const results = await Promise.allSettled(arr.map(processAttachedFile));
+    const good = results
+      .filter((r): r is PromiseFulfilledResult<AttachedFile> => r.status === "fulfilled")
+      .map((r) => r.value);
+    if (good.length) setAttachedFiles((prev) => [...prev, ...good]);
+    setIsProcessing(false);
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -375,12 +449,8 @@ export default function SiteBuilder() {
     e.target.value = "";
   };
 
-  // Drag-drop on the chat panel
   const handleDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("Files")) {
-      e.preventDefault();
-      setIsDragOver(true);
-    }
+    if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setIsDragOver(true); }
   };
   const handleDragLeave = (e: React.DragEvent) => {
     if (!chatPanelRef.current?.contains(e.relatedTarget as Node)) setIsDragOver(false);
@@ -393,15 +463,25 @@ export default function SiteBuilder() {
 
   // ── Core AI execution ───────────────────────────────────────────────────────
 
-  const runAiPrompt = async (prompt: string, imgs: AttachedImage[]) => {
+  const runAiPrompt = async (prompt: string, attachments: AttachedFile[]) => {
     const currentPages = pagesRef.current || [];
     const existingFiles = currentPages.map((p) => ({
       name: p.slug,
       content: editMapRef.current.has(p.id) ? editMapRef.current.get(p.id)! : p.content,
     }));
 
+    // Separate visual attachments (images / video frames) from audio notes
+    const visualFiles = attachments.filter((f) => f.dataUrl && (f.fileType === "image" || f.fileType === "video"));
+    const audioFiles  = attachments.filter((f) => f.fileType === "audio");
+
+    // Append audio context to the prompt text so the AI knows about it
+    let fullPrompt = prompt;
+    if (audioFiles.length > 0) {
+      fullPrompt += `\n\n[User also shared ${audioFiles.length === 1 ? "an audio recording" : "audio recordings"}: ${audioFiles.map((f) => f.originalName).join(", ")}. Consider this as a voice note or reference they want to use in the site.]`;
+    }
+
     // Add user message to UI
-    const userMsg: AiMsg = { role: "user", text: prompt, images: imgs.length > 0 ? imgs : undefined };
+    const userMsg: AiMsg = { role: "user", text: prompt, images: attachments.length > 0 ? attachments : undefined };
     setAiMessages((prev) => [...prev, userMsg, { role: "thinking" }]);
     aiLoadingRef.current = true;
     setAiLoading(true);
@@ -415,10 +495,10 @@ export default function SiteBuilder() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          message: prompt,
+          message: fullPrompt,
           existingFiles,
           history,
-          images: imgs.map((img) => img.dataUrl),
+          images: visualFiles.map((f) => f.dataUrl),
         }),
       });
 
@@ -491,28 +571,28 @@ export default function SiteBuilder() {
       setQueueLength(messageQueueRef.current.length);
       if (next) {
         setAiMessages((prev) => prev.filter((m) => !(m.role === "queued" && (m as any).text === next.text)));
-        setTimeout(() => runAiPrompt(next.text, next.images), 150);
+        setTimeout(() => runAiPrompt(next.text, next.files), 150);
       }
     }
   };
 
   const handleAiSend = (overridePrompt?: string) => {
     const prompt = (overridePrompt ?? aiInput).trim();
-    if (!prompt && attachedImages.length === 0) return;
-    const finalPrompt = prompt || "Here's an image for reference";
-    const imgs = [...attachedImages];
+    if (!prompt && attachedFiles.length === 0) return;
+    const finalPrompt = prompt || (attachedFiles.length === 1 ? `Here's a ${attachedFiles[0].fileType} for reference` : "Here are some files for reference");
+    const files = [...attachedFiles];
 
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     setAiInput("");
-    setAttachedImages([]);
+    setAttachedFiles([]);
 
     if (aiLoadingRef.current) {
-      messageQueueRef.current.push({ text: finalPrompt, images: imgs });
+      messageQueueRef.current.push({ text: finalPrompt, files });
       const pos = messageQueueRef.current.length;
       setQueueLength(pos);
       setAiMessages((prev) => [...prev, { role: "queued", text: finalPrompt, position: pos } as AiMsg]);
     } else {
-      runAiPrompt(finalPrompt, imgs);
+      runAiPrompt(finalPrompt, files);
     }
   };
 
@@ -825,7 +905,7 @@ export default function SiteBuilder() {
                 messageQueueRef.current = [];
                 conversationHistoryRef.current = [];
                 setQueueLength(0);
-                setAttachedImages([]);
+                setAttachedFiles([]);
               }}
               className="w-7 h-7 flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/6 rounded transition-colors"
               title="New conversation"
@@ -844,18 +924,46 @@ export default function SiteBuilder() {
 
           {/* Input area */}
           <div className="p-3 border-t border-white/6 shrink-0 space-y-2">
-            {/* Attached image previews */}
-            {attachedImages.length > 0 && (
+
+            {/* Processing indicator */}
+            {isProcessing && (
+              <div className="flex items-center gap-2 px-1 text-[11px] text-white/40 font-mono">
+                <Loader2 className="w-3 h-3 animate-spin" /> Processing file…
+              </div>
+            )}
+
+            {/* Attached file previews */}
+            {attachedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 px-1">
-                {attachedImages.map((img) => (
-                  <div key={img.id} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-white/15 shrink-0">
-                    <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => setAttachedImages((prev) => prev.filter((i) => i.id !== img.id))}
-                      className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                    >
-                      <X className="w-4 h-4 text-white" />
-                    </button>
+                {attachedFiles.map((f) => (
+                  <div key={f.id} className="relative group shrink-0">
+                    {f.fileType === "audio" ? (
+                      /* Audio — pill chip */
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/25 max-w-[120px]">
+                        <span className="text-sm shrink-0">🎙️</span>
+                        <span className="text-[10px] font-mono text-purple-300 truncate">{f.originalName}</span>
+                        <button onClick={() => setAttachedFiles((prev) => prev.filter((i) => i.id !== f.id))} className="shrink-0 text-purple-400/60 hover:text-white transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : f.fileType === "video" ? (
+                      /* Video — thumbnail + film badge */
+                      <div className="w-14 h-14 rounded-lg overflow-hidden border border-white/15 relative">
+                        <img src={f.dataUrl} alt={f.originalName} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[8px] text-center text-white font-mono py-0.5">🎬</div>
+                        <button onClick={() => setAttachedFiles((prev) => prev.filter((i) => i.id !== f.id))} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      /* Image — plain thumbnail */
+                      <div className="w-14 h-14 rounded-lg overflow-hidden border border-white/15">
+                        <img src={f.dataUrl} alt={f.originalName} className="w-full h-full object-cover" />
+                        <button onClick={() => setAttachedFiles((prev) => prev.filter((i) => i.id !== f.id))} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -876,11 +984,10 @@ export default function SiteBuilder() {
                 style={{ minHeight: "40px", maxHeight: "140px" }}
               />
               <div className="flex items-center justify-between px-3 pb-2 pt-1 gap-2">
-                {/* Attach image button */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-6 h-6 flex items-center justify-center text-white/25 hover:text-white/60 rounded transition-colors shrink-0"
-                  title="Attach image"
+                  title="Attach image, video, or audio"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
                 </button>
@@ -889,21 +996,21 @@ export default function SiteBuilder() {
                 </span>
                 <button
                   onClick={() => handleAiSend()}
-                  disabled={!aiInput.trim() && attachedImages.length === 0}
+                  disabled={!aiInput.trim() && attachedFiles.length === 0}
                   className="w-7 h-7 flex items-center justify-center bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors shrink-0"
                 >
                   <Send className="w-3.5 h-3.5 text-white" />
                 </button>
               </div>
             </div>
-            <p className="text-[10px] text-white/15 font-mono text-center">Drag & drop images · AI may make mistakes</p>
+            <p className="text-[10px] text-white/15 font-mono text-center">Drop images, videos, recordings · AI reads them all</p>
           </div>
 
-          {/* Hidden file input */}
+          {/* Hidden file input — accepts any image, video, or audio */}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*,audio/*"
             multiple
             className="hidden"
             onChange={handleFileInput}
@@ -1150,14 +1257,24 @@ function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string
     return (
       <div className="flex justify-end">
         <div className="max-w-[88%] space-y-1.5">
-          {/* Image thumbnails */}
+          {/* Attached files */}
           {msg.images && msg.images.length > 0 && (
             <div className="flex flex-wrap gap-1.5 justify-end">
-              {msg.images.map((img) => (
-                <div key={img.id} className="w-20 h-20 rounded-xl overflow-hidden border border-white/20 shrink-0">
-                  <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
-                </div>
-              ))}
+              {msg.images.map((f) =>
+                f.fileType === "audio" ? (
+                  <div key={f.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                    <span className="text-sm">🎙️</span>
+                    <span className="text-[10px] font-mono text-purple-200 max-w-[100px] truncate">{f.originalName}</span>
+                  </div>
+                ) : f.dataUrl ? (
+                  <div key={f.id} className="w-20 h-20 rounded-xl overflow-hidden border border-white/20 shrink-0 relative">
+                    <img src={f.dataUrl} alt={f.originalName} className="w-full h-full object-cover" />
+                    {f.fileType === "video" && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-center text-[9px] text-white py-0.5">🎬 video</div>
+                    )}
+                  </div>
+                ) : null
+              )}
             </div>
           )}
           {/* Text bubble */}
