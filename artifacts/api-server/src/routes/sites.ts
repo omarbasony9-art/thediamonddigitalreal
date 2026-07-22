@@ -177,8 +177,19 @@ router.post("/sites/:id/publish", requireAdminAuth, async (req: any, res: any): 
   const id = Number(req.params.id);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const host = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || req.headers.host || "localhost";
-  const publishedUrl = `https://${host}/api/s/${id}/`;
+  // Prefer the forwarded host (what the browser actually sees) so the URL works
+  // whether this is the dev preview or the deployed production app.
+  const host = (req.headers["x-forwarded-host"] as string)?.split(",")[0].trim()
+    || req.headers.host
+    || process.env.REPLIT_DOMAINS
+    || "localhost";
+
+  // Look up the site so we can build a human-readable slug
+  const [existing] = await db.select().from(sitesTable).where(eq(sitesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Site not found" }); return; }
+
+  const slug = existing.projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const publishedUrl = `https://${host}/api/s/${slug}/`;
 
   const [site] = await db
     .update(sitesTable)

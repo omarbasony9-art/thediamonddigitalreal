@@ -164,6 +164,7 @@ export default function SiteBuilder() {
   // Restore publishedUrl from site.domain if it looks like our hosted URL
   useEffect(() => {
     if (site?.domain && site.domain.includes("/api/s/")) setPublishedUrl(site.domain);
+    else if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
   }, [site]);
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
