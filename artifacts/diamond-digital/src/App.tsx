@@ -18,6 +18,7 @@ import QuotesList from "./pages/admin/QuotesList";
 import SitesList from "./pages/admin/SitesList";
 import SiteBuilder from "./pages/admin/SiteBuilder";
 import AdminSignIn from "./pages/admin/AdminSignIn";
+import NewProject from "./pages/admin/NewProject";
 import NotFound from "./pages/not-found";
 
 // Layouts
@@ -190,6 +191,9 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/admin/sites">
               <ProtectedAdminRoute><SitesList /></ProtectedAdminRoute>
+            </Route>
+            <Route path="/admin/new-project">
+              <ProtectedAdminRoute><NewProject /></ProtectedAdminRoute>
             </Route>
             <Route path="/admin/sites/:id">
               <ProtectedAdminRoute><SiteBuilder /></ProtectedAdminRoute>

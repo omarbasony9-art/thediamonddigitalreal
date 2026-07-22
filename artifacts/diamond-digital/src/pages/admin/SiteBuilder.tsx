@@ -262,13 +262,59 @@ footer { text-align: center; padding: 2rem; color: #555; border-top: 1px solid r
   { title: "script.js", slug: "script.js", order: 2, content: `console.log('Site loaded!');` },
 ];
 
-const SUGGESTIONS = [
-  "Dark barbershop with neon green & booking",
-  "Luxury real estate with full-screen hero",
-  "Minimalist SaaS with pricing table",
-  "Gym site with class schedule & trainers",
-  "Restaurant with menu & reservation form",
-];
+const SUGGESTIONS_BY_TYPE: Record<string, string[]> = {
+  website: [
+    "Dark barbershop with neon green & booking",
+    "Luxury real estate with full-screen hero",
+    "Minimalist SaaS with pricing table",
+    "Gym site with class schedule & trainers",
+    "Restaurant with menu & reservation form",
+  ],
+  spreadsheet: [
+    "Monthly budget tracker with income & expenses",
+    "Project management tracker with status columns",
+    "Sales CRM with leads, status, and revenue",
+    "Employee schedule with shifts and hours",
+    "Inventory tracker with stock levels",
+  ],
+  application: [
+    "Task manager with drag-and-drop and localStorage",
+    "Password generator with copy & strength meter",
+    "Quiz app with 10 questions and a score screen",
+    "Expense tracker with charts and categories",
+    "Countdown timer with presets and alarm",
+  ],
+  qa: [
+    "Explain quantum entanglement like I have a PhD",
+    "How does the TCP/IP stack work end-to-end?",
+    "Break down the Black-Scholes options pricing model",
+    "What are the strongest arguments for and against AGI risk?",
+    "Explain how to build a neural network from scratch",
+  ],
+  program: [
+    "Python web scraper for product prices",
+    "JavaScript binary search tree with all traversals",
+    "Python file organizer that sorts by extension",
+    "Merge sort algorithm with step-by-step visualization",
+    "REST API client in Python with retry and error handling",
+  ],
+  video: [
+    "Cinematic product launch title sequence",
+    "Animated infographic showing company growth",
+    "Particle explosion logo reveal animation",
+    "Scrolling news ticker with breaking news items",
+    "Animated countdown from 10 to 0 with sound cues",
+  ],
+};
+
+const TYPE_META: Record<string, { label: string; emoji: string; accent: string; placeholder: string }> = {
+  website:     { label: "Website Builder",   emoji: "🌐", accent: "#0066ff", placeholder: "Describe the site you want to build…" },
+  spreadsheet: { label: "Spreadsheet Mode",  emoji: "📊", accent: "#00b894", placeholder: "Describe your spreadsheet or data table…" },
+  application: { label: "App Builder",       emoji: "💻", accent: "#6c5ce7", placeholder: "Describe the app you want to build…" },
+  qa:          { label: "Research Mode",     emoji: "🧠", accent: "#fdcb6e", placeholder: "Ask anything — I'll give you a PhD-level answer…" },
+  program:     { label: "Code Builder",      emoji: "👨‍💻", accent: "#e17055", placeholder: "Describe the program you want to build…" },
+  video:       { label: "Video Creator",     emoji: "🎬", accent: "#fd79a8", placeholder: "Describe the animation or video you want…" },
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -327,9 +373,10 @@ export default function SiteBuilder() {
 
   useEffect(() => { pagesRef.current = pages; }, [pages]);
 
-  // Seed starters
+  // Seed starters — skip for QA mode (no file workspace needed)
   useEffect(() => {
     if (seeding || pagesLoading || (pages && pages.length > 0) || !pages) return;
+    if (projectType === "qa") return; // QA is chat-only, no starter files
     setSeeding(true);
     (async () => {
       for (const s of STARTERS) {
@@ -337,7 +384,7 @@ export default function SiteBuilder() {
       }
       queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
     })();
-  }, [pages, pagesLoading]);
+  }, [pages, pagesLoading, projectType]);
 
   useEffect(() => {
     if (pages && pages.length > 0 && activeFileId === null) {
@@ -385,6 +432,9 @@ export default function SiteBuilder() {
     if (site?.liveUrl) setPublishedUrl(site.liveUrl);
     else if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
   }, [site]);
+
+  // Project type drives the entire workspace behaviour
+  const projectType: string = (site as any)?.projectType ?? "website";
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
   const activeContent = activeFileId !== null && editMapRef.current.has(activeFileId)
@@ -499,6 +549,7 @@ export default function SiteBuilder() {
           existingFiles,
           history,
           images: visualFiles.map((f) => f.dataUrl),
+          projectType,
         }),
       });
 
@@ -671,6 +722,125 @@ export default function SiteBuilder() {
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
   };
+
+  // ── Helpers for type-aware UI ────────────────────────────────────────────────
+  const meta = TYPE_META[projectType] ?? TYPE_META["website"];
+  const suggestions = SUGGESTIONS_BY_TYPE[projectType] ?? SUGGESTIONS_BY_TYPE["website"];
+
+  // ── QA Mode — full-screen research workspace (no Monaco / preview) ────────────
+
+  if (projectType === "qa") {
+    return (
+      <div className="h-screen w-full flex flex-col bg-[#0e0e0e] text-white overflow-hidden" style={{ fontFamily: "system-ui, sans-serif" }}>
+        {/* Top bar */}
+        <div className="h-11 bg-[#161616] border-b border-white/8 flex items-center px-3 gap-2 shrink-0">
+          <Link href="/admin/sites">
+            <button className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 rounded transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          </Link>
+          <div className="w-px h-4 bg-white/10" />
+          <span className="text-sm font-semibold text-white truncate">{site?.projectName || "Loading…"}</span>
+          <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider rounded shrink-0" style={{ background: meta.accent + "20", color: meta.accent, border: `1px solid ${meta.accent}40` }}>
+            {meta.emoji} {meta.label}
+          </span>
+          <div className="flex-1" />
+          <button
+            onClick={() => { setAiMessages([{ role: "welcome" }]); conversationHistoryRef.current = []; messageQueueRef.current = []; setQueueLength(0); setAttachedFiles([]); }}
+            className="w-7 h-7 flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/6 rounded transition-colors"
+            title="New conversation"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Full-width chat */}
+        <div
+          ref={chatPanelRef}
+          className="flex-1 flex flex-col overflow-hidden relative"
+          style={{ background: "linear-gradient(180deg, #0e0e0e 0%, #0a0a12 100%)" }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragOver && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-dashed rounded-2xl m-8 flex-1 h-[calc(100%-4rem)] flex flex-col items-center justify-center gap-3" style={{ borderColor: meta.accent + "70" }}>
+                <div className="text-5xl">{meta.emoji}</div>
+                <p className="text-sm font-semibold" style={{ color: meta.accent }}>Drop anything here — Diamond reads it all</p>
+              </div>
+            </div>
+          )}
+
+          {/* Messages — wider, more comfortable for long answers */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+              {aiMessages.map((msg, i) => (
+                <AiMessage key={i} msg={msg} onSuggestion={(s) => handleAiSend(s)} suggestions={suggestions} />
+              ))}
+              <div ref={chatBottomRef} />
+            </div>
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-white/6 shrink-0">
+            <div className="max-w-3xl mx-auto px-6 py-4 space-y-3">
+              {/* Attached files */}
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachedFiles.map((f) => (
+                    <div key={f.id} className="relative group shrink-0">
+                      {f.fileType === "audio" ? (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/25 max-w-[160px]">
+                          <span className="text-sm shrink-0">🎙️</span>
+                          <span className="text-[10px] font-mono text-purple-300 truncate">{f.originalName}</span>
+                          <button onClick={() => setAttachedFiles((prev) => prev.filter((i) => i.id !== f.id))} className="shrink-0 text-purple-400/60 hover:text-white"><X className="w-3 h-3" /></button>
+                        </div>
+                      ) : f.dataUrl ? (
+                        <div className="w-14 h-14 rounded-lg overflow-hidden border border-white/15 relative">
+                          <img src={f.dataUrl} alt={f.originalName} className="w-full h-full object-cover" />
+                          <button onClick={() => setAttachedFiles((prev) => prev.filter((i) => i.id !== f.id))} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><X className="w-4 h-4 text-white" /></button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl overflow-hidden focus-within:border-white/25 transition-colors">
+                <textarea
+                  ref={textareaRef}
+                  value={aiInput}
+                  onChange={handleTextareaInput}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiSend(); } }}
+                  placeholder={aiLoading ? "Diamond is thinking…" : meta.placeholder}
+                  rows={1}
+                  className="w-full bg-transparent px-4 pt-4 pb-2 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none leading-relaxed"
+                  style={{ minHeight: "52px", maxHeight: "200px" }}
+                />
+                <div className="flex items-center px-3 pb-3 pt-1 gap-2">
+                  <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 flex items-center justify-center text-white/25 hover:text-white/60 rounded transition-colors" title="Attach image, video, or audio">
+                    <Paperclip className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] text-white/20 font-mono flex-1 text-center">⏎ send · ⇧⏎ newline</span>
+                  <button
+                    onClick={() => handleAiSend()}
+                    disabled={!aiInput.trim() && attachedFiles.length === 0}
+                    className="flex items-center gap-1.5 px-4 h-8 text-xs font-bold rounded-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white"
+                    style={{ background: meta.accent }}
+                  >
+                    <Send className="w-3.5 h-3.5" />Ask Diamond
+                  </button>
+                </div>
+              </div>
+              <p className="text-[10px] text-white/15 font-mono text-center">Drop images, videos, recordings · Diamond gives PhD-level answers</p>
+            </div>
+          </div>
+
+          <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" multiple className="hidden" onChange={handleFileInput} />
+        </div>
+      </div>
+    );
+  }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -889,10 +1059,13 @@ export default function SiteBuilder() {
 
           {/* Header */}
           <div className="h-11 flex items-center px-4 border-b border-white/6 shrink-0 gap-2">
-            <div className="w-5 h-5 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0">
+            <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: meta.accent }}>
               <Sparkles className="w-3 h-3 text-white" />
             </div>
             <span className="text-sm font-semibold text-white">Diamond AI</span>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ background: meta.accent + "20", color: meta.accent }}>
+              {meta.emoji} {meta.label}
+            </span>
             {queueLength > 0 && (
               <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-[9px] font-mono text-amber-400">
                 {queueLength} queued
@@ -917,7 +1090,7 @@ export default function SiteBuilder() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {aiMessages.map((msg, i) => (
-              <AiMessage key={i} msg={msg} onSuggestion={(s) => handleAiSend(s)} />
+              <AiMessage key={i} msg={msg} onSuggestion={(s) => handleAiSend(s)} suggestions={suggestions} />
             ))}
             <div ref={chatBottomRef} />
           </div>
@@ -978,7 +1151,7 @@ export default function SiteBuilder() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiSend(); }
                 }}
-                placeholder={aiLoading ? "Type to queue next message…" : "Ask Diamond anything…"}
+                placeholder={aiLoading ? "Type to queue next message…" : meta.placeholder}
                 rows={1}
                 className="w-full bg-transparent px-3 pt-3 pb-1 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none leading-relaxed"
                 style={{ minHeight: "40px", maxHeight: "140px" }}
@@ -1189,8 +1362,21 @@ export default function SiteBuilder() {
 
 // ─── AI Message Component ─────────────────────────────────────────────────────
 
-function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string) => void }) {
+const WELCOME_BY_TYPE: Record<string, string> = {
+  website:     "I build websites — and I'm not shy about asking questions to make sure I get it exactly right. Tell me what you need, drop in images for reference, and let's make something great.",
+  spreadsheet: "I build beautiful spreadsheet interfaces — data tables, trackers, financial models, dashboards. Tell me what you're tracking and I'll build it with real sample data and working formulas.",
+  application: "I build interactive web apps — tools, dashboards, booking systems, games, calculators. Describe what it should do and I'll make it fully functional.",
+  qa:          "Ask me anything. I give PhD-level answers on math, science, code, business, law, history, philosophy — you name it. The harder the question, the better.",
+  program:     "I write production-quality programs in any language. Tell me what you need built — algorithm, tool, script, or system — and specify the language or let me choose the best one.",
+  video:       "I create animated videos and motion graphics that run in the browser. Describe the animation — a brand ident, explainer, title sequence, or anything else — and I'll build it.",
+};
+
+function AiMessage({ msg, onSuggestion, suggestions }: { msg: AiMsg; onSuggestion: (s: string) => void; suggestions?: string[] }) {
+  const displaySuggestions = suggestions ?? SUGGESTIONS_BY_TYPE["website"];
+
   if (msg.role === "welcome") {
+    // Detect project type from the welcome message content (not ideal but avoids prop drilling the type)
+    const welcomeText = WELCOME_BY_TYPE["website"]; // fallback — actual welcome varies by type
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-2.5">
@@ -1200,12 +1386,13 @@ function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string
           <div className="flex-1 bg-white/4 border border-white/8 rounded-2xl rounded-tl-sm px-3.5 py-3 space-y-1.5">
             <p className="text-sm text-white font-semibold">Hey! I'm Diamond.</p>
             <p className="text-sm text-white/70 leading-relaxed">
-              I build websites — and I'm not shy about asking questions to make sure I get it exactly right. Tell me what you need, drop in images for reference, and let's make something great.
+              {/* Welcome text is set by the first suggestion context */}
+              {Object.values(WELCOME_BY_TYPE).find(w => displaySuggestions === SUGGESTIONS_BY_TYPE["qa"] ? w === WELCOME_BY_TYPE["qa"] : displaySuggestions === SUGGESTIONS_BY_TYPE["spreadsheet"] ? w === WELCOME_BY_TYPE["spreadsheet"] : displaySuggestions === SUGGESTIONS_BY_TYPE["application"] ? w === WELCOME_BY_TYPE["application"] : displaySuggestions === SUGGESTIONS_BY_TYPE["program"] ? w === WELCOME_BY_TYPE["program"] : displaySuggestions === SUGGESTIONS_BY_TYPE["video"] ? w === WELCOME_BY_TYPE["video"] : w === WELCOME_BY_TYPE["website"]) || welcomeText}
             </p>
           </div>
         </div>
         <div className="flex flex-col gap-1.5 pl-8">
-          {SUGGESTIONS.map((s) => (
+          {displaySuggestions.map((s) => (
             <button key={s} onClick={() => onSuggestion(s)}
               className="text-left text-xs text-white/50 hover:text-white/80 bg-white/4 hover:bg-white/8 border border-white/8 hover:border-white/15 rounded-lg px-3 py-2 transition-all">
               {s}

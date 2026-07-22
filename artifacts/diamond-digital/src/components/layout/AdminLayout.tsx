@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Inbox, Globe, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, Inbox, Globe, LogOut, Menu, X, PlusCircle } from "lucide-react";
 
 function getAdminUsername(): string {
   try {
@@ -30,6 +30,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { icon: Inbox, label: "Quote Requests", href: "/admin/quotes" },
     { icon: Globe, label: "Client Sites", href: "/admin/sites" },
   ];
+
+  const isNewProject = location === "/admin/new-project";
 
   if (isSiteBuilder) {
     return <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">{children}</div>;
@@ -68,7 +70,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </Link>
         </div>
         <div className="p-4 flex-1 flex flex-col gap-1">
-          <div className="text-xs font-mono text-muted-foreground mb-2 mt-4 px-2 tracking-widest">WORKSPACE</div>
+          {/* Create New Project — prominent CTA */}
+          <Link href="/admin/new-project">
+            <button className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-semibold mb-3 transition-colors ${isNewProject ? "bg-primary text-[#08080C]" : "bg-primary/15 text-primary hover:bg-primary/25 border border-primary/20"}`}>
+              <PlusCircle className="w-4 h-4 shrink-0" />
+              Create A New Project
+            </button>
+          </Link>
+          <div className="text-xs font-mono text-muted-foreground mb-2 mt-2 px-2 tracking-widest">WORKSPACE</div>
           <NavLinks />
         </div>
         <div className="p-4 border-t border-border flex items-center justify-between">
@@ -124,6 +133,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               </button>
             </div>
             <div className="p-4 flex-1 flex flex-col gap-1">
+              <Link href="/admin/new-project" onClick={() => setMobileOpen(false)}>
+                <button className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-semibold mb-3 transition-colors ${isNewProject ? "bg-primary text-[#08080C]" : "bg-primary/15 text-primary hover:bg-primary/25 border border-primary/20"}`}>
+                  <PlusCircle className="w-4 h-4 shrink-0" />
+                  Create A New Project
+                </button>
+              </Link>
               <div className="text-xs font-mono text-muted-foreground mb-2 mt-2 px-2 tracking-widest">WORKSPACE</div>
               <NavLinks onClick={() => setMobileOpen(false)} />
             </div>

@@ -9,6 +9,7 @@ export const sitesTable = pgTable("sites", {
   domain: text("domain"),
   status: text("status").notNull().default("draft"),
   tech: text("tech").notNull().default("react"),
+  projectType: text("project_type").notNull().default("website"),
   description: text("description"),
   liveUrl: text("live_url"),
   previewUrl: text("preview_url"),

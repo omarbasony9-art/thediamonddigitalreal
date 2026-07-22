@@ -176,7 +176,8 @@ export const CreateSiteBody = zod.object({
   "clientName": zod.string().min(1),
   "projectName": zod.string().min(1),
   "domain": zod.string().optional(),
-  "tech": zod.enum(['react', 'nextjs', 'vanilla', 'wordpress', 'other']),
+  "tech": zod.enum(['react', 'nextjs', 'vanilla', 'wordpress', 'other']).optional().default('react'),
+  "projectType": zod.enum(['website', 'spreadsheet', 'application', 'qa', 'program', 'video']).optional().default('website'),
   "description": zod.string().optional(),
   "clientEmail": zod.string().optional(),
   "quoteId": zod.number().optional()
