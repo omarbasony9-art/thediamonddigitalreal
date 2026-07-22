@@ -120,21 +120,16 @@ export default function About() {
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.9 }}
-            className="relative"
+            className="relative flex items-center justify-center"
           >
-            <div className="aspect-square bg-card border border-white/10 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-grid opacity-20" />
-              <div className="absolute top-0 right-0 w-72 h-72 bg-primary/15 blur-[120px] rounded-full" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 blur-[80px] rounded-full" />
-              {/* Tech stack visual */}
-              <div className="relative z-10 grid grid-cols-3 gap-3 p-12">
-                {["React", "Node.js", "Python", "Go", "PostgreSQL", "AWS", "TypeScript", "Docker", "Redis"].map((tech, i) => (
-                  <div key={i} className="px-2 py-1.5 border border-white/10 bg-background/50 text-xs font-mono text-primary text-center">
-                    {tech}
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Radial glow behind the logo */}
+            <div className="absolute w-72 h-72 bg-primary/10 blur-[100px] rounded-full" />
+            <div className="absolute w-48 h-48 bg-blue-500/10 blur-[60px] rounded-full" />
+            <img
+              src={`${import.meta.env.BASE_URL}logo.svg`}
+              alt="DiamondDigital"
+              className="relative w-64 h-64 md:w-80 md:h-80 opacity-20 drop-shadow-[0_0_60px_rgba(0,255,255,0.15)] select-none pointer-events-none"
+            />
           </motion.div>
         </div>
 
