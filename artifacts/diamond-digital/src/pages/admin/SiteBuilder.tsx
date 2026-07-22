@@ -358,8 +358,8 @@ export default function SiteBuilder() {
   const aiLoadingRef = useRef(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<typeof pages>(undefined);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -374,6 +374,9 @@ export default function SiteBuilder() {
   const deletePage = useDeleteSitePage();
 
   useEffect(() => { pagesRef.current = pages; }, [pages]);
+
+  // Project type drives the entire workspace behaviour — declared early so useEffects can use it
+  const projectType: string = (site as any)?.projectType ?? "website";
 
   // Seed starters — skip for QA mode (no file workspace needed)
   useEffect(() => {
@@ -434,9 +437,6 @@ export default function SiteBuilder() {
     if (site?.liveUrl) setPublishedUrl(site.liveUrl);
     else if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
   }, [site]);
-
-  // Project type drives the entire workspace behaviour
-  const projectType: string = (site as any)?.projectType ?? "website";
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
   const activeContent = activeFileId !== null && editMapRef.current.has(activeFileId)
@@ -999,7 +999,7 @@ export default function SiteBuilder() {
                     bracketPairColorization: { enabled: true },
                   }}
                   onMount={(editor) => {
-                    editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: handleSave });
+                    editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: () => { void handleSave(); } });
                   }}
                 />
               ) : (

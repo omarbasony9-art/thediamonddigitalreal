@@ -149,13 +149,16 @@ export const SiteInputTech = {
   other: 'other',
 } as const;
 
+export type SiteInputProjectType = 'website' | 'spreadsheet' | 'application' | 'qa' | 'program' | 'video';
+
 export interface SiteInput {
   /** @minLength 1 */
   clientName: string;
   /** @minLength 1 */
   projectName: string;
   domain?: string;
-  tech: SiteInputTech;
+  tech?: SiteInputTech;
+  projectType?: SiteInputProjectType;
   description?: string;
   clientEmail?: string;
   quoteId?: number;
