@@ -172,28 +172,40 @@ router.post("/sites/:id/launch", requireAdminAuth, async (req, res): Promise<voi
   res.json(site);
 });
 
-// Publish a site — marks it live, returns the hosted URL (no custom domain needed)
+// Publish a site — link a custom domain and mark it live
 router.post("/sites/:id/publish", requireAdminAuth, async (req: any, res: any): Promise<void> => {
   const id = Number(req.params.id);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  // Prefer the forwarded host (what the browser actually sees) so the URL works
-  // whether this is the dev preview or the deployed production app.
-  const host = (req.headers["x-forwarded-host"] as string)?.split(",")[0].trim()
-    || req.headers.host
-    || process.env.REPLIT_DOMAINS
-    || "localhost";
+  // Clean the domain the user entered: strip protocol, trailing slash, lowercase
+  const rawDomain: string = req.body?.customDomain ?? "";
+  const customDomain = rawDomain.trim().toLowerCase()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/.*$/, ""); // strip any path
 
-  // Look up the site so we can build a human-readable slug
   const [existing] = await db.select().from(sitesTable).where(eq(sitesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Site not found" }); return; }
 
   const slug = existing.projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const publishedUrl = `https://${host}/api/s/${slug}/`;
+
+  // If a custom domain was provided, use it; otherwise fall back to the internal path URL
+  const fallbackHost =
+    (req.headers["x-forwarded-host"] as string)?.split(",")[0].trim() ||
+    req.headers.host ||
+    process.env.REPLIT_DOMAINS ||
+    "localhost";
+  const publishedUrl = customDomain
+    ? `https://${customDomain}`
+    : `https://${fallbackHost}/api/s/${slug}/`;
 
   const [site] = await db
     .update(sitesTable)
-    .set({ status: "live", domain: publishedUrl, launchedAt: new Date() })
+    .set({
+      status: "live",
+      domain: customDomain || null,   // plain domain e.g. "thenails.com"
+      liveUrl: publishedUrl,          // full URL e.g. "https://thenails.com"
+      launchedAt: new Date(),
+    })
     .where(eq(sitesTable.id, id))
     .returning();
 
@@ -206,7 +218,7 @@ router.post("/sites/:id/publish", requireAdminAuth, async (req: any, res: any): 
     entityType: "site",
   });
 
-  res.json({ ...site, publishedUrl });
+  res.json({ ...site, publishedUrl, customDomain: customDomain || null });
 });
 
 // List site pages (admin only)

@@ -123,7 +123,10 @@ export default function SiteBuilder() {
   const [seeding, setSeeding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [publishStep, setPublishStep] = useState<"domain" | "live">("domain");
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [domainInput, setDomainInput] = useState("");
+  const [platformDomain, setPlatformDomain] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   // Track unsaved edits for ALL files — keyed by file id.
@@ -248,18 +251,36 @@ export default function SiteBuilder() {
     toast({ title: `Saved ${dirty.length} file${dirty.length > 1 ? "s" : ""} ✓` });
   }, [pages, id, updatePage, queryClient, toast]);
 
+  const openPublishDialog = async () => {
+    // Pre-fill domain from existing site data if already linked
+    const existingDomain = site?.domain && !site.domain.startsWith("http") ? site.domain : "";
+    setDomainInput(existingDomain);
+    setPublishStep("domain");
+    setPublishOpen(true);
+    // Fetch platform domain for CNAME instructions
+    try {
+      const token = localStorage.getItem("admin_token");
+      const r = await fetch(`${import.meta.env.BASE_URL}api/admin/deployment-domain`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json();
+      if (d.domain) setPlatformDomain(d.domain);
+    } catch { /* non-critical */ }
+  };
+
   const handlePublish = async () => {
     setPublishing(true);
     try {
       const token = localStorage.getItem("admin_token");
       const res = await fetch(`${import.meta.env.BASE_URL}api/sites/${id}/publish`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ customDomain: domainInput.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Publish failed");
       setPublishedUrl(data.publishedUrl);
-      setPublishOpen(true);
+      setPublishStep("live");
       queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
     } catch (err: any) {
       toast({ title: "Publish failed", description: err.message, variant: "destructive" });
@@ -445,15 +466,15 @@ export default function SiteBuilder() {
             {updatePage.isPending ? "Saving…" : "Save All"}
           </button>
         )}
-        {isLive && publishedUrl ? (
-          <button onClick={() => setPublishOpen(true)}
+        {isLive && site?.liveUrl ? (
+          <button onClick={openPublishDialog}
             className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded hover:bg-emerald-600/30 transition-colors">
-            <Globe className="w-3 h-3" /> View Live
+            <Globe className="w-3 h-3" /> Live ↗
           </button>
         ) : (
-          <button onClick={handlePublish} disabled={publishing}
-            className="flex items-center gap-1.5 px-3 h-7 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-50 text-white text-xs font-mono font-bold rounded transition-colors">
-            {publishing ? <><Loader2 className="w-3 h-3 animate-spin" />Publishing…</> : <><Globe className="w-3 h-3" />Publish</>}
+          <button onClick={openPublishDialog}
+            className="flex items-center gap-1.5 px-3 h-7 bg-[#0066ff] hover:bg-[#0052cc] text-white text-xs font-mono font-bold rounded transition-colors">
+            <Globe className="w-3 h-3" />Publish
           </button>
         )}
       </div>
@@ -670,36 +691,121 @@ export default function SiteBuilder() {
       {/* PUBLISH DIALOG */}
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
         <DialogContent className="sm:max-w-md bg-[#1a1a1a] border-white/10 rounded-xl text-white">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              Site is Live!
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-1">
-            <p className="text-sm text-white/50">Your website is publicly accessible at:</p>
-            <div className="flex items-center gap-2 bg-black/30 border border-white/8 rounded-lg px-3 py-2.5">
-              <Globe className="w-4 h-4 text-[#0066ff] shrink-0" />
-              <span className="flex-1 text-sm font-mono text-blue-300 truncate">{publishedUrl}</span>
-              <button onClick={() => { if (publishedUrl) { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); } }}
-                className="text-white/30 hover:text-white transition-colors shrink-0">
-                <Copy className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setPublishOpen(false)} className="flex-1 border-white/10 text-white/60 hover:text-white rounded-lg font-mono text-xs">
-                Close
-              </Button>
-              <Button onClick={() => window.open(publishedUrl!, "_blank")}
-                className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] text-white rounded-lg font-mono text-xs">
-                <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Site
-              </Button>
-            </div>
-            <div className="border border-white/8 bg-white/3 rounded-lg p-3 text-xs text-white/35 leading-relaxed">
-              <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5 text-white/40" />
-              This URL is always live. Republish anytime to push new changes.
-            </div>
-          </div>
+
+          {/* ── STEP 1: Link a domain ── */}
+          {publishStep === "domain" && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Globe className="w-4 h-4 text-[#0066ff]" />
+                  Link a Domain & Publish
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-5 pt-1">
+                {/* Domain input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-white/50">Client's domain</label>
+                  <div className="flex items-center gap-0 bg-black/30 border border-white/10 focus-within:border-[#0066ff]/60 rounded-lg overflow-hidden transition-colors">
+                    <span className="px-3 text-xs font-mono text-white/30 bg-white/4 border-r border-white/8 h-10 flex items-center shrink-0">https://</span>
+                    <input
+                      type="text"
+                      value={domainInput}
+                      onChange={(e) => setDomainInput(e.target.value.replace(/^https?:\/\//i, ""))}
+                      onKeyDown={(e) => { if (e.key === "Enter" && domainInput.trim()) handlePublish(); }}
+                      placeholder="myclient.com"
+                      className="flex-1 bg-transparent px-3 py-2.5 text-sm font-mono text-white placeholder:text-white/25 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* DNS instructions */}
+                <div className="space-y-2">
+                  <p className="text-xs font-mono text-white/40 uppercase tracking-wider">DNS setup — point your domain here</p>
+                  <div className="bg-black/40 border border-white/8 rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-3 border-b border-white/6 text-[10px] font-mono text-white/30 px-3 py-1.5 bg-white/3">
+                      <span>TYPE</span><span>NAME</span><span>VALUE</span>
+                    </div>
+                    <div className="grid grid-cols-3 px-3 py-2.5 text-xs font-mono">
+                      <span className="text-amber-400">CNAME</span>
+                      <span className="text-white/60">@</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-emerald-400 truncate">{platformDomain || "your-platform-domain"}</span>
+                        {platformDomain && (
+                          <button onClick={() => { navigator.clipboard.writeText(platformDomain); toast({ title: "Copied!" }); }}
+                            className="text-white/20 hover:text-white/60 shrink-0 transition-colors">
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-white/25 leading-relaxed">
+                    Add this record in your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.). DNS can take up to 48 hours to propagate.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                  <Button variant="outline" onClick={() => setPublishOpen(false)}
+                    className="flex-1 border-white/10 text-white/50 hover:text-white rounded-lg font-mono text-xs h-9">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handlePublish}
+                    disabled={publishing || !domainInput.trim()}
+                    className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-40 text-white rounded-lg font-mono text-xs h-9">
+                    {publishing
+                      ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Publishing…</>
+                      : <><Globe className="w-3.5 h-3.5 mr-1.5" />Publish to {domainInput.trim() || "domain"}</>}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 2: Success ── */}
+          {publishStep === "live" && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  Site Published!
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-1">
+                <p className="text-sm text-white/50">Your site is published at:</p>
+                <div className="flex items-center gap-2 bg-black/30 border border-white/8 rounded-lg px-3 py-2.5">
+                  <Globe className="w-4 h-4 text-[#0066ff] shrink-0" />
+                  <span className="flex-1 text-sm font-mono text-blue-300 truncate">{publishedUrl}</span>
+                  <button onClick={() => { if (publishedUrl) { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); } }}
+                    className="text-white/30 hover:text-white transition-colors shrink-0">
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {platformDomain && (
+                  <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg p-3 space-y-1">
+                    <p className="text-xs font-mono text-amber-400/80 font-semibold">DNS reminder</p>
+                    <p className="text-[11px] text-white/40 leading-relaxed">
+                      Make sure your CNAME record points <span className="text-white/60 font-mono">{domainInput}</span> → <span className="text-emerald-400 font-mono">{platformDomain}</span>
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => setPublishOpen(false)}
+                    className="flex-1 border-white/10 text-white/60 hover:text-white rounded-lg font-mono text-xs">
+                    Close
+                  </Button>
+                  <Button onClick={() => window.open(publishedUrl!, "_blank")}
+                    className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] text-white rounded-lg font-mono text-xs">
+                    <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Site
+                  </Button>
+                </div>
+                <p className="text-[10px] text-white/20 font-mono text-center">Republish anytime to push new changes to the live site.</p>
+              </div>
+            </>
+          )}
+
         </DialogContent>
       </Dialog>
 
