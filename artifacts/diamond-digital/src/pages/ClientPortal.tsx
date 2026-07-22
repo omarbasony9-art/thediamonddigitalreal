@@ -133,7 +133,7 @@ export default function ClientPortal() {
       <header className="border-b border-white/8 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Software Diamond" className="w-7 h-7" />
+            <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="The Diamond Digital" className="w-7 h-7" />
             <span className="font-display font-bold text-base tracking-wider text-white">
               DIAMOND<span className="text-primary">DIGITAL</span>
             </span>

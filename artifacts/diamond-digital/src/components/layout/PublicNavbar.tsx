@@ -32,7 +32,7 @@ export function PublicNavbar() {
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <img
             src={`${import.meta.env.BASE_URL}logo.svg`}
-            alt="Software Diamond Logo"
+            alt="The Diamond Digital Logo"
             className="w-7 h-7 sm:w-8 sm:h-8 group-hover:scale-110 transition-transform duration-300"
           />
           <span className="font-display font-bold text-base sm:text-xl tracking-wider text-white">

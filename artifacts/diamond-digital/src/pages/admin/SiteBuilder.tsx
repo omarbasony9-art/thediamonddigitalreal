@@ -1352,7 +1352,7 @@ export default function SiteBuilder() {
                           <span className="text-amber-400">CNAME</span>
                           <span className="text-white/50">@</span>
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-emerald-400 truncate">{platformDomain || "softwarediamond.com"}</span>
+                            <span className="text-emerald-400 truncate">{platformDomain || "thediamonddigital.com"}</span>
                             {platformDomain && (
                               <button onClick={() => { navigator.clipboard.writeText(platformDomain); toast({ title: "Copied!" }); }}
                                 className="text-white/20 hover:text-white/60 shrink-0 transition-colors">
