@@ -4,10 +4,12 @@ import quotesRouter from "./quotes";
 import sitesRouter from "./sites";
 import adminStatsRouter from "./adminStats";
 import clientAuthRouter from "./clientAuth";
+import adminAuthRouter from "./adminAuth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(adminAuthRouter);
 router.use(quotesRouter);
 router.use(sitesRouter);
 router.use(adminStatsRouter);

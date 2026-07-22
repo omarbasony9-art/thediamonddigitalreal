@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { ClerkProvider, SignIn, SignUp, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -16,6 +17,7 @@ import Dashboard from "./pages/admin/Dashboard";
 import QuotesList from "./pages/admin/QuotesList";
 import SitesList from "./pages/admin/SitesList";
 import SiteBuilder from "./pages/admin/SiteBuilder";
+import AdminSignIn from "./pages/admin/AdminSignIn";
 import NotFound from "./pages/not-found";
 
 // Layouts
@@ -26,6 +28,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const queryClient = new QueryClient();
+
+// Attach admin JWT to all API requests automatically
+setAuthTokenGetter(() => localStorage.getItem("admin_token"));
 
 // Clerk configuration
 const clerkPubKey = publishableKeyFromHost(
@@ -172,6 +177,9 @@ function ClerkProviderWithRoutes() {
           <Switch>
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
+
+            {/* Admin Login */}
+            <Route path="/admin/login" component={AdminSignIn} />
 
             {/* Admin Routes */}
             <Route path="/admin">

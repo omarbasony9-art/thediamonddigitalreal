@@ -1,0 +1,2 @@
+- [Admin auth system](admin-auth.md) — Clerk replaced with custom JWT for admin routes; single admin account in admin_users table
+- [Site builder IDE](site-builder-ide.md) — Monaco editor + live iframe preview; starter files auto-seeded from STARTERS array when site has no pages

@@ -3,12 +3,20 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Menu, X, Shield, User } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@clerk/react";
+
+function isAdminLoggedIn() {
+  try {
+    const token = localStorage.getItem("admin_token");
+    if (!token) return false;
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000 > Date.now();
+  } catch { return false; }
+}
 
 export function PublicNavbar() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const { isSignedIn } = useAuth();
+  const adminLoggedIn = isAdminLoggedIn();
 
   const links = [
     { href: "/", label: "Home" },
@@ -37,7 +45,6 @@ export function PublicNavbar() {
             </Link>
           ))}
 
-          {/* CLIENT PORTAL */}
           <Link href="/client-login" className="ml-1">
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white hover:bg-white/5 font-mono text-xs tracking-widest gap-1.5 rounded-none border border-white/10 h-9 px-4">
               <User className="w-3.5 h-3.5" />
@@ -45,31 +52,19 @@ export function PublicNavbar() {
             </Button>
           </Link>
 
-          {/* ADMIN */}
-          {isSignedIn ? (
-            <Link href="/admin">
-              <Button variant="outline" size="sm" className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-mono text-xs tracking-widest gap-1.5 h-9 rounded-none">
-                <Shield className="w-3.5 h-3.5" />
-                CONSOLE
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/sign-in">
-              <Button variant="outline" size="sm" className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-mono text-xs tracking-widest gap-1.5 h-9 rounded-none">
-                <Shield className="w-3.5 h-3.5" />
-                ADMIN
-              </Button>
-            </Link>
-          )}
+          <Link href={adminLoggedIn ? "/admin" : "/admin/login"}>
+            <Button variant="outline" size="sm" className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-mono text-xs tracking-widest gap-1.5 h-9 rounded-none">
+              <Shield className="w-3.5 h-3.5" />
+              {adminLoggedIn ? "CONSOLE" : "ADMIN"}
+            </Button>
+          </Link>
         </div>
 
-        {/* Mobile Toggle */}
         <button className="md:hidden text-white" onClick={() => setIsOpen(!isOpen)}>
           {isOpen ? <X /> : <Menu />}
         </button>
       </div>
 
-      {/* Mobile Menu */}
       {isOpen && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -89,19 +84,11 @@ export function PublicNavbar() {
                 <User className="w-4 h-4" /> CLIENT PORTAL
               </Button>
             </Link>
-            {isSignedIn ? (
-              <Link href="/admin" onClick={() => setIsOpen(false)}>
-                <Button className="w-full bg-primary text-primary-foreground font-mono text-sm gap-2 rounded-none">
-                  <Shield className="w-4 h-4" /> ADMIN CONSOLE
-                </Button>
-              </Link>
-            ) : (
-              <Link href="/sign-in" onClick={() => setIsOpen(false)}>
-                <Button className="w-full bg-primary text-primary-foreground font-mono text-sm gap-2 rounded-none">
-                  <Shield className="w-4 h-4" /> ADMIN
-                </Button>
-              </Link>
-            )}
+            <Link href={adminLoggedIn ? "/admin" : "/admin/login"} onClick={() => setIsOpen(false)}>
+              <Button className="w-full bg-primary text-primary-foreground font-mono text-sm gap-2 rounded-none">
+                <Shield className="w-4 h-4" /> {adminLoggedIn ? "ADMIN CONSOLE" : "ADMIN"}
+              </Button>
+            </Link>
           </div>
         </motion.div>
       )}

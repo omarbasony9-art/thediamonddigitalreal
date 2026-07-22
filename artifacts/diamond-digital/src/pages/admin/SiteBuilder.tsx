@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, Link } from "wouter";
+import Editor from "@monaco-editor/react";
 import {
   useGetSite,
   useUpdateSite,
@@ -9,31 +10,227 @@ import {
   useUpdateSitePage,
   useDeleteSitePage,
   getGetSiteQueryKey,
-  getListSitePagesQueryKey
+  getListSitePagesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Play, Layout, Settings, FileCode, CheckCircle2, Globe, File, Plus, Trash2, Save, ExternalLink, Copy, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft, Play, RefreshCw, Settings, Plus, Trash2, FileCode,
+  Globe, CheckCircle2, ExternalLink, Copy, AlertTriangle, X, ChevronRight
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
+// ── Types ──────────────────────────────────────────────────────────────────
+type FileItem = { id: number; title: string; slug: string; content: string; order: number };
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const getLang = (slug: string) => {
+  if (slug.endsWith(".html")) return "html";
+  if (slug.endsWith(".css")) return "css";
+  if (slug.endsWith(".js")) return "javascript";
+  if (slug.endsWith(".ts")) return "typescript";
+  if (slug.endsWith(".json")) return "json";
+  if (slug.endsWith(".md")) return "markdown";
+  return "plaintext";
+};
+
+const getFileIcon = (slug: string) => {
+  if (slug.endsWith(".html")) return "🌐";
+  if (slug.endsWith(".css")) return "🎨";
+  if (slug.endsWith(".js")) return "⚡";
+  if (slug.endsWith(".ts")) return "🔷";
+  return "📄";
+};
+
+const buildPreview = (files: FileItem[]) => {
+  const htmlFile = files.find((f) => getLang(f.slug) === "html");
+  if (!htmlFile)
+    return `<html><body style="font:14px system-ui;color:#666;padding:48px;text-align:center;background:#111"><p style="margin-bottom:8px;font-size:18px">No HTML file</p><p style="font-size:13px;opacity:.6">Create an <strong>index.html</strong> file to see the preview.</p></body></html>`;
+
+  let doc = htmlFile.content;
+  const cssFiles = files.filter((f) => getLang(f.slug) === "css");
+  const jsFiles = files.filter((f) => getLang(f.slug) === "javascript");
+
+  const styles = cssFiles.map((f) => `<style>/* ${f.slug} */\n${f.content}</style>`).join("\n");
+  const scripts = jsFiles.map((f) => `<script>/* ${f.slug} */\n${f.content}\n<\/script>`).join("\n");
+
+  if (doc.includes("</head>")) doc = doc.replace("</head>", `${styles}\n</head>`);
+  else doc = styles + doc;
+  if (doc.includes("</body>")) doc = doc.replace("</body>", `${scripts}\n</body>`);
+  else doc += scripts;
+
+  return doc;
+};
+
+// ── Starter files ──────────────────────────────────────────────────────────
+const STARTERS: Omit<FileItem, "id">[] = [
+  {
+    title: "index.html", slug: "index.html", order: 0,
+    content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Website</title>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">My Brand</div>
+    <nav>
+      <a href="#">Home</a>
+      <a href="#">About</a>
+      <a href="#">Contact</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Build Something Amazing</h1>
+    <p>Your website starts here. Edit the files on the left to make it yours.</p>
+    <button class="btn" onclick="handleClick()">Get Started</button>
+  </section>
+
+  <section class="features">
+    <div class="card"><h3>Fast</h3><p>Built for speed and performance.</p></div>
+    <div class="card"><h3>Reliable</h3><p>Always online, always working.</p></div>
+    <div class="card"><h3>Beautiful</h3><p>Designed to impress visitors.</p></div>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 My Website. All rights reserved.</p>
+  </footer>
+</body>
+</html>`,
+  },
+  {
+    title: "style.css", slug: "style.css", order: 1,
+    content: `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0f0f1a;
+  color: #e8e8f0;
+  line-height: 1.6;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 2rem;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky; top: 0;
+  backdrop-filter: blur(12px);
+}
+
+.logo { font-weight: 800; font-size: 1.1rem; color: #00cfff; letter-spacing: 1px; }
+
+nav a { color: #aaa; text-decoration: none; margin-left: 1.5rem; font-size: .9rem; transition: color .2s; }
+nav a:hover { color: #fff; }
+
+.hero {
+  text-align: center;
+  padding: 6rem 2rem;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0,207,255,.08) 0%, transparent 60%);
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #fff 0%, #00cfff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero p { color: #888; font-size: 1.1rem; margin-bottom: 2rem; }
+
+.btn {
+  background: #00cfff; color: #0f0f1a;
+  border: none; padding: .85rem 2rem;
+  font-size: .95rem; font-weight: 700; cursor: pointer;
+  letter-spacing: .5px; transition: opacity .2s;
+}
+.btn:hover { opacity: .85; }
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem; max-width: 900px; margin: 0 auto; padding: 4rem 2rem;
+}
+
+.card {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  padding: 2rem; border-radius: 2px;
+}
+.card h3 { color: #00cfff; margin-bottom: .5rem; }
+.card p { color: #888; font-size: .9rem; }
+
+footer {
+  text-align: center; padding: 2rem; color: #555;
+  border-top: 1px solid rgba(255,255,255,.06);
+  font-size: .85rem; margin-top: 4rem;
+}`,
+  },
+  {
+    title: "script.js", slug: "script.js", order: 2,
+    content: `// Main JavaScript
+console.log('Site loaded!');
+
+function handleClick() {
+  alert('Welcome! Edit the files to build your site.');
+}
+
+// Animate cards on scroll
+document.addEventListener('DOMContentLoaded', () => {
+  const cards = document.querySelectorAll('.card');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  cards.forEach(card => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    card.style.transition = 'opacity 0.5s, transform 0.5s';
+    observer.observe(card);
+  });
+});`,
+  },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────
 export default function SiteBuilder() {
   const params = useParams();
   const id = Number(params.id);
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<"pages" | "settings">("pages");
-  const [activePageId, setActivePageId] = useState<number | null>(null);
-  const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
+  const [activeFileId, setActiveFileId] = useState<number | null>(null);
+  const [editedContent, setEditedContent] = useState<string>("");
+  const [previewDoc, setPreviewDoc] = useState<string>("");
+  const [previewKey, setPreviewKey] = useState(0);
+  const [launchOpen, setLaunchOpen] = useState(false);
   const [launchDomain, setLaunchDomain] = useState("");
-  const [launchedDomain, setLaunchedDomain] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [addingFile, setAddingFile] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
-  const { data: site, isLoading: siteLoading, isError: siteError } = useGetSite(id, { query: { enabled: !!id, queryKey: getGetSiteQueryKey(id) } });
-  const { data: pages, isLoading: pagesLoading } = useListSitePages(id, { query: { enabled: !!id, queryKey: getListSitePagesQueryKey(id) } });
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const { data: site } = useGetSite(id, { query: { queryKey: getGetSiteQueryKey(id) } });
+  const { data: pages, isLoading: pagesLoading } = useListSitePages(id, {
+    query: { queryKey: getListSitePagesQueryKey(id) },
+  });
 
   const updateSite = useUpdateSite();
   const launchSite = useLaunchSite();
@@ -41,435 +238,477 @@ export default function SiteBuilder() {
   const updatePage = useUpdateSitePage();
   const deletePage = useDeleteSitePage();
 
-  // Pre-fill domain from site settings
+  // Seed starter files when no pages exist
   useEffect(() => {
-    if (site?.domain) setLaunchDomain(site.domain);
-  }, [site?.domain]);
+    if (seeding || pagesLoading || (pages && pages.length > 0)) return;
+    if (!pages) return;
+    setSeeding(true);
+    const seedFiles = async () => {
+      for (const starter of STARTERS) {
+        await new Promise<void>((resolve) => {
+          createPage.mutate(
+            { id, data: { title: starter.title, slug: starter.slug, content: starter.content } },
+            { onSuccess: () => resolve(), onError: () => resolve() }
+          );
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+    };
+    seedFiles();
+  }, [pages, pagesLoading]);
 
-  const handleOpenLaunchDialog = () => {
-    if (site?.status === "live") return;
-    setLaunchDialogOpen(true);
-  };
-
-  const handleConfirmLaunch = async () => {
-    if (!launchDomain.trim()) {
-      toast({ variant: "destructive", title: "Domain required", description: "Enter a domain name to launch the site." });
-      return;
+  // Set active file on first load
+  useEffect(() => {
+    if (pages && pages.length > 0 && activeFileId === null) {
+      const html = pages.find((p) => p.slug.endsWith(".html")) || pages[0];
+      setActiveFileId(html.id);
+      setEditedContent(html.content);
     }
-    const domain = launchDomain.trim().replace(/^https?:\/\//i, "");
+  }, [pages, activeFileId]);
 
-    // Save domain first, then launch
-    await new Promise<void>((resolve) => {
-      updateSite.mutate({ id, data: { domain } }, { onSuccess: () => resolve(), onError: () => resolve() });
-    });
+  // Sync edited content when switching files
+  const switchFile = useCallback(
+    (file: FileItem) => {
+      setActiveFileId(file.id);
+      setEditedContent(file.content);
+    },
+    []
+  );
 
-    launchSite.mutate({ id }, {
-      onSuccess: () => {
-        setLaunchedDomain(domain);
-        setLaunchDialogOpen(false);
-        toast({ title: "Site launched!", description: `${domain} is now live.` });
-        queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
-      },
-      onError: () => {
-        toast({ variant: "destructive", title: "Launch failed", description: "Please try again." });
+  // Auto-preview with debounce
+  useEffect(() => {
+    if (!pages) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const activeFile = pages.find((p) => p.id === activeFileId);
+      if (!activeFile) return;
+      const merged = pages.map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p));
+      setPreviewDoc(buildPreview(merged as FileItem[]));
+    }, 600);
+    return () => clearTimeout(debounceRef.current);
+  }, [editedContent, pages, activeFileId]);
+
+  // Initial preview
+  useEffect(() => {
+    if (pages && pages.length > 0) {
+      setPreviewDoc(buildPreview(pages as FileItem[]));
+    }
+  }, [pages]);
+
+  const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
+
+  const handleSave = () => {
+    if (!activeFile) return;
+    updatePage.mutate(
+      { id, pageId: activeFile.id, data: { content: editedContent, title: activeFile.title } },
+      {
+        onSuccess: () => {
+          toast({ title: "Saved" });
+          queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+          const merged = (pages || []).map((p) =>
+            p.id === activeFile.id ? { ...p, content: editedContent } : p
+          );
+          setPreviewDoc(buildPreview(merged as FileItem[]));
+          setPreviewKey((k) => k + 1);
+        },
       }
-    });
+    );
   };
 
-  const handleCreatePage = () => {
-    const title = prompt("Page title:");
-    if (!title) return;
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    createPage.mutate({ id, data: { title, slug, content: `# ${title}\n\nAdd your page content here.` } }, {
-      onSuccess: (newPage) => {
-        queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
-        setActivePageId(newPage.id);
-        toast({ title: "Page created" });
-      }
-    });
+  const handleRun = () => {
+    const merged = (pages || []).map((p) =>
+      p.id === activeFileId ? { ...p, content: editedContent } : p
+    );
+    setPreviewDoc(buildPreview(merged as FileItem[]));
+    setPreviewKey((k) => k + 1);
   };
 
-  const handleDeletePage = (pageId: number) => {
-    if (!confirm("Delete this page?")) return;
-    deletePage.mutate({ id, pageId }, {
-      onSuccess: () => {
-        if (activePageId === pageId) setActivePageId(null);
-        queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
-        toast({ title: "Page deleted" });
+  const handleAddFile = () => {
+    if (!newFileName.trim()) return;
+    let slug = newFileName.trim();
+    if (!slug.includes(".")) slug += ".html";
+    createPage.mutate(
+      { id, data: { title: slug, slug, content: `<!-- ${slug} -->\n` } },
+      {
+        onSuccess: (f) => {
+          queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+          setActiveFileId(f.id);
+          setEditedContent(f.content);
+          setNewFileName("");
+          setAddingFile(false);
+          toast({ title: `Created ${slug}` });
+        },
       }
-    });
+    );
   };
 
-  const copyToClipboard = (text: string) => {
+  const handleDeleteFile = (fileId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this file?")) return;
+    deletePage.mutate(
+      { id, pageId: fileId },
+      {
+        onSuccess: () => {
+          if (activeFileId === fileId) { setActiveFileId(null); setEditedContent(""); }
+          queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+          toast({ title: "File deleted" });
+        },
+      }
+    );
+  };
+
+  const handleLaunch = async () => {
+    if (!launchDomain.trim()) return;
+    const domain = launchDomain.replace(/^https?:\/\//i, "").trim();
+    await new Promise<void>((r) => updateSite.mutate({ id, data: { domain } }, { onSuccess: () => r(), onError: () => r() }));
+    launchSite.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          setLaunchOpen(false);
+          toast({ title: "Site launched!", description: `${domain} is now live.` });
+          queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
+        },
+      }
+    );
+  };
+
+  const copyText = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copied to clipboard" });
+    toast({ title: "Copied" });
   };
 
-  if (siteError) return <div className="p-8 text-center text-destructive">Error loading site.</div>;
-  if (siteLoading) return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground font-mono text-sm">LOADING BUILDER...</div>;
-
-  const activePage = pages?.find(p => p.id === activePageId) || pages?.[0];
+  const hasUnsavedChanges = activeFile && editedContent !== activeFile.content;
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden font-sans">
+    <div className="h-screen w-full flex flex-col bg-[#1e1e1e] text-white overflow-hidden select-none" style={{ fontFamily: "system-ui, sans-serif" }}>
 
       {/* ── TOP BAR ── */}
-      <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/admin/sites">
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white rounded-none">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-muted-foreground" />
-            <span className="font-bold text-white text-sm">{site?.projectName}</span>
-            <span className="text-muted-foreground text-xs mx-1">/</span>
-            <span className="text-muted-foreground text-sm">{site?.clientName}</span>
-          </div>
-          <div className={`px-2 py-0.5 text-[10px] font-mono tracking-wider ml-2 ${
-            site?.status === "live" ? "bg-primary/20 text-primary border border-primary/30" :
-            site?.status === "building" ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" :
-            site?.status === "review" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" :
-            "bg-white/5 text-muted-foreground border border-white/10"
+      <div className="h-12 bg-[#161616] border-b border-white/8 flex items-center px-3 gap-3 shrink-0 z-10">
+        <Link href="/admin/sites">
+          <button className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/8 rounded transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        </Link>
+        <div className="w-px h-5 bg-white/10" />
+
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-sm">
+          <span className="text-white/40 font-mono">{site?.clientName}</span>
+          <ChevronRight className="w-3.5 h-3.5 text-white/20" />
+          <span className="text-white font-semibold">{site?.projectName || "Loading…"}</span>
+        </div>
+
+        {site?.status && (
+          <span className={`px-2 py-0.5 text-[10px] font-mono tracking-wider ${
+            site.status === "live" ? "bg-emerald-500/20 text-emerald-400" :
+            site.status === "building" ? "bg-blue-500/20 text-blue-400" :
+            "bg-white/8 text-white/40"
           }`}>
-            {site?.status?.toUpperCase()}
+            {site.status.toUpperCase()}
+          </span>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Actions */}
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/8 rounded transition-colors"
+          title="Site settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={handleRun}
+          className="flex items-center gap-1.5 px-3 h-7 bg-white/10 hover:bg-white/15 text-white text-xs font-mono rounded transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" /> Refresh
+        </button>
+
+        {hasUnsavedChanges && (
+          <button
+            onClick={handleSave}
+            disabled={updatePage.isPending}
+            className="flex items-center gap-1.5 px-3 h-7 bg-amber-500/90 hover:bg-amber-500 text-black text-xs font-mono rounded font-bold transition-colors"
+          >
+            {updatePage.isPending ? "Saving…" : "Save"}
+          </button>
+        )}
+
+        {site?.status !== "live" ? (
+          <button
+            onClick={() => { setLaunchDomain(site?.domain || ""); setLaunchOpen(true); }}
+            className="flex items-center gap-1.5 px-4 h-7 bg-primary text-[#0a0a10] text-xs font-mono font-bold rounded transition-colors hover:bg-primary/90"
+          >
+            <Play className="w-3 h-3 fill-current" /> Launch
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 h-7 bg-emerald-500/20 text-emerald-400 text-xs font-mono rounded border border-emerald-500/30">
+            <CheckCircle2 className="w-3 h-3" /> Live
           </div>
-          {site?.domain && (
-            <a href={`https://${site.domain}`} target="_blank" rel="noreferrer" className="hidden md:flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors font-mono">
-              <ExternalLink className="w-3 h-3" />
-              {site.domain}
-            </a>
-          )}
-        </div>
+        )}
+      </div>
 
-        <div className="flex items-center gap-3">
-          {site?.previewUrl && (
-            <Button variant="outline" size="sm" className="h-8 rounded-none border-border font-mono text-xs text-muted-foreground hover:text-white" asChild>
-              <a href={site.previewUrl} target="_blank" rel="noreferrer">PREVIEW</a>
-            </Button>
-          )}
-          {site?.status !== "live" ? (
-            <Button
-              onClick={handleOpenLaunchDialog}
-              className="h-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-none font-mono text-xs px-6 gap-2"
+      {/* ── FILE TABS ── */}
+      <div className="h-9 bg-[#252526] border-b border-white/8 flex items-end overflow-x-auto shrink-0">
+        {pages?.map((file) => {
+          const active = file.id === activeFileId;
+          return (
+            <button
+              key={file.id}
+              onClick={() => switchFile(file as FileItem)}
+              className={`flex items-center gap-2 px-4 h-full text-xs font-mono transition-colors shrink-0 border-r border-white/5 ${
+                active ? "bg-[#1e1e1e] text-white border-t border-t-primary" : "text-white/40 hover:text-white/70 hover:bg-white/4"
+              }`}
             >
-              <Play className="w-3 h-3 fill-current" /> LAUNCH SITE
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2 text-primary font-mono text-xs px-4 border border-primary/30 h-8 bg-primary/10">
-              <CheckCircle2 className="w-3 h-3" /> LIVE
-            </div>
-          )}
-        </div>
-      </header>
+              <span>{getFileIcon(file.slug)}</span>
+              {file.slug}
+              {active && hasUnsavedChanges && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setAddingFile(true)}
+          className="flex items-center gap-1 px-3 h-full text-white/30 hover:text-white/60 hover:bg-white/4 text-xs transition-colors shrink-0"
+          title="New file"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
-      {/* ── WORKSPACE ── */}
+      {/* ── MAIN WORKSPACE ── */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* Left Sidebar */}
-        <div className="w-64 border-r border-border bg-[#0a0a10] flex flex-col shrink-0">
-          <div className="flex border-b border-border">
-            {(["pages", "settings"] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`flex-1 py-3 text-xs font-mono tracking-wider border-b-2 transition-colors ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-white"}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === "pages" ? <Layout className="w-4 h-4 mx-auto mb-1" /> : <Settings className="w-4 h-4 mx-auto mb-1" />}
-                {tab.toUpperCase()}
-              </button>
-            ))}
+        {/* File Explorer Sidebar */}
+        <div className="w-52 bg-[#252526] border-r border-white/8 flex flex-col shrink-0 overflow-hidden">
+          <div className="px-3 py-2 text-[10px] font-mono text-white/30 uppercase tracking-widest border-b border-white/5 flex items-center justify-between">
+            <span>Explorer</span>
+            <button onClick={() => setAddingFile(true)} className="hover:text-white/60 transition-colors"><Plus className="w-3 h-3" /></button>
           </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === "pages" && (
-              <div className="p-2">
-                <div className="flex items-center justify-between px-2 py-2 mb-2 text-xs font-mono text-muted-foreground uppercase">
-                  <span>File Tree</span>
-                  <button onClick={handleCreatePage} className="hover:text-primary transition-colors"><Plus className="w-4 h-4" /></button>
-                </div>
-                {pagesLoading ? (
-                  <div className="px-4 py-2 text-sm text-muted-foreground">Loading...</div>
-                ) : pages?.map(page => (
-                  <div key={page.id} className="group flex items-center justify-between pr-2">
+          <div className="flex-1 overflow-y-auto py-1">
+            {pagesLoading ? (
+              <div className="px-4 py-3 text-xs text-white/30 font-mono">Loading…</div>
+            ) : (
+              pages?.map((file) => {
+                const active = file.id === activeFileId;
+                return (
+                  <div
+                    key={file.id}
+                    onClick={() => switchFile(file as FileItem)}
+                    className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${active ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}
+                  >
+                    <div className="flex items-center gap-2 text-xs font-mono truncate">
+                      <span className="shrink-0">{getFileIcon(file.slug)}</span>
+                      <span className="truncate">{file.slug}</span>
+                    </div>
                     <button
-                      onClick={() => setActivePageId(page.id)}
-                      className={`flex-1 flex items-center gap-2 px-3 py-2 text-sm text-left truncate rounded-sm transition-colors ${activePageId === page.id || (!activePageId && activePage?.id === page.id) ? "bg-primary/20 text-primary font-medium" : "text-muted-foreground hover:bg-white/5 hover:text-white"}`}
+                      onClick={(e) => handleDeleteFile(file.id, e)}
+                      className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-all shrink-0 ml-1"
                     >
-                      <FileCode className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{page.slug}.tsx</span>
-                    </button>
-                    <button onClick={() => handleDeletePage(page.id)} className="w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
-                ))}
-                {!pagesLoading && (!pages || pages.length === 0) && (
-                  <div className="px-4 py-6 text-center">
-                    <File className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-xs text-muted-foreground mb-3">No pages yet</p>
-                    <button onClick={handleCreatePage} className="text-xs text-primary hover:text-primary/80 font-mono">+ Add page</button>
-                  </div>
-                )}
-              </div>
+                );
+              })
             )}
-
-            {activeTab === "settings" && site && (
-              <SiteSettingsPanel site={site} updateSite={updateSite} queryClient={queryClient} />
+            {addingFile && (
+              <div className="px-3 py-2 border-t border-white/5 mt-1">
+                <Input
+                  autoFocus
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddFile(); if (e.key === "Escape") setAddingFile(false); }}
+                  placeholder="filename.html"
+                  className="h-6 text-xs font-mono bg-white/10 border-white/20 rounded-none px-2 text-white placeholder:text-white/30"
+                />
+                <div className="flex gap-1 mt-1.5">
+                  <button onClick={handleAddFile} className="text-[10px] font-mono text-primary hover:text-primary/80">Create</button>
+                  <button onClick={() => { setAddingFile(false); setNewFileName(""); }} className="text-[10px] font-mono text-white/30 hover:text-white/60 ml-2">Cancel</button>
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Main Editor */}
-        <div className="flex-1 bg-[#1e1e24] flex flex-col overflow-hidden relative">
-          <div className="absolute inset-0 opacity-40 z-0" style={{backgroundImage: "radial-gradient(circle, #2a2a35 1px, transparent 1px)", backgroundSize: "20px 20px"}} />
-
-          {activeTab === "pages" ? (
-            activePage ? (
-              <PageEditor page={activePage} siteId={id} updatePage={updatePage} queryClient={queryClient} />
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground relative z-10 flex-col gap-4">
-                <File className="w-16 h-16 opacity-20" />
-                <p className="font-mono text-sm">Select or create a page to start editing</p>
-                <Button variant="outline" onClick={handleCreatePage} className="border-border text-white rounded-none">Add First Page</Button>
-              </div>
-            )
+        {/* Monaco Editor */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {activeFile ? (
+            <Editor
+              height="100%"
+              language={getLang(activeFile.slug)}
+              value={editedContent}
+              onChange={(val) => setEditedContent(val || "")}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                tabSize: 2,
+                wordWrap: "off",
+                scrollBeyondLastLine: false,
+                renderLineHighlight: "all",
+                automaticLayout: true,
+                fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace",
+                fontLigatures: true,
+                cursorBlinking: "smooth",
+                smoothScrolling: true,
+                padding: { top: 16, bottom: 16 },
+                lineNumbers: "on",
+                bracketPairColorization: { enabled: true },
+              }}
+              onMount={(editor) => {
+                editor.addAction({
+                  id: "save-file",
+                  label: "Save File",
+                  keybindings: [2097 /* Ctrl+S */],
+                  run: () => handleSave(),
+                });
+              }}
+            />
           ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground relative z-10 flex-col gap-4">
-              <Settings className="w-16 h-16 opacity-20" />
-              <p className="font-mono text-sm">Site settings in sidebar</p>
+            <div className="flex-1 flex items-center justify-center text-white/20 flex-col gap-3">
+              <FileCode className="w-12 h-12" />
+              <p className="text-sm font-mono">Select a file to edit</p>
             </div>
           )}
         </div>
+
+        {/* Live Preview */}
+        <div className="w-[42%] bg-white flex flex-col border-l border-white/8 shrink-0">
+          <div className="h-8 bg-[#2d2d2d] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+            </div>
+            <div className="flex-1 mx-3 bg-[#1e1e1e] rounded text-[10px] font-mono text-white/30 px-2 py-0.5 truncate">
+              {site?.domain ? `https://${site.domain}` : "preview"}
+            </div>
+            <button onClick={handleRun} className="text-white/30 hover:text-white/60 transition-colors" title="Refresh preview">
+              <RefreshCw className="w-3 h-3" />
+            </button>
+          </div>
+          <iframe
+            ref={iframeRef}
+            key={previewKey}
+            srcDoc={previewDoc}
+            sandbox="allow-scripts"
+            className="flex-1 w-full border-none bg-white"
+            title="Site preview"
+          />
+        </div>
+      </div>
+
+      {/* ── STATUS BAR ── */}
+      <div className="h-6 bg-[#007acc] flex items-center px-4 gap-4 text-[11px] text-white/80 shrink-0">
+        <span className="font-mono">{activeFile ? getLang(activeFile.slug).toUpperCase() : ""}</span>
+        <span className="flex-1" />
+        <span className="font-mono">
+          {pages?.length ?? 0} file{(pages?.length ?? 0) !== 1 ? "s" : ""}
+        </span>
+        {hasUnsavedChanges && <span className="text-amber-300 font-mono">● Unsaved changes</span>}
+        <span className="font-mono">Ctrl+S to save</span>
       </div>
 
       {/* ── LAUNCH DIALOG ── */}
-      <Dialog open={launchDialogOpen} onOpenChange={setLaunchDialogOpen}>
-        <DialogContent className="sm:max-w-lg bg-card border-border rounded-none text-white">
+      <Dialog open={launchOpen} onOpenChange={setLaunchOpen}>
+        <DialogContent className="sm:max-w-md bg-[#252526] border-white/10 rounded-none text-white">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl flex items-center gap-3">
-              <Play className="w-5 h-5 text-primary fill-current" />
-              LAUNCH SITE
+            <DialogTitle className="font-mono text-base flex items-center gap-2">
+              <Play className="w-4 h-4 text-primary fill-current" /> Launch Site
             </DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-6 pt-2">
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Launching marks the site as live. All you need is a domain pointed to your hosting. Enter the domain below — we'll save it and flip the site to live status.
-            </p>
-
+          <div className="space-y-5 pt-2">
+            <p className="text-sm text-white/50">Enter the domain you've pointed to this server. We'll save it and mark the site live.</p>
             <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase mb-2 block">Domain Name *</label>
-              <Input
-                placeholder="www.clientwebsite.com"
-                value={launchDomain}
-                onChange={e => setLaunchDomain(e.target.value)}
-                className="bg-background border-white/10 rounded-none focus-visible:ring-primary h-11 text-white font-mono"
-              />
-              <p className="text-xs text-muted-foreground mt-1.5">No https:// needed. Example: example.com or www.example.com</p>
+              <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-2 block">Domain *</label>
+              <Input value={launchDomain} onChange={e => setLaunchDomain(e.target.value)} placeholder="www.example.com"
+                className="bg-[#1e1e1e] border-white/10 rounded-none font-mono text-white h-10" />
             </div>
-
             {launchDomain.trim() && (
-              <div className="border border-white/10 bg-background/40 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-mono text-amber-400 mb-3">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  AFTER LAUNCH: DNS CONFIGURATION REQUIRED
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">Point your domain to this server by adding one of the following DNS records with your domain registrar:</p>
+              <div className="border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 text-[10px] font-mono mb-3"><AlertTriangle className="w-3.5 h-3.5" /> DNS REQUIRED AFTER LAUNCH</div>
                 {[
-                  { type: "A Record", name: launchDomain.replace(/^www\./i, "") || "@", value: "76.76.21.21" },
-                  { type: "CNAME", name: launchDomain.startsWith("www.") ? launchDomain : `www.${launchDomain}`, value: "cname.vercel-dns.com" },
-                ].map((rec, i) => (
-                  <div key={i} className="flex items-center justify-between gap-4 py-2 border-t border-white/5 text-xs font-mono">
-                    <span className="text-muted-foreground/60 w-16">{rec.type}</span>
-                    <span className="text-white/70 truncate flex-1">{rec.name}</span>
-                    <span className="text-primary">{rec.value}</span>
-                    <button onClick={() => copyToClipboard(rec.value)} className="text-muted-foreground hover:text-white transition-colors shrink-0">
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+                  { type: "A", name: "@", value: "76.76.21.21" },
+                  { type: "CNAME", name: "www", value: "cname.vercel-dns.com" },
+                ].map((r, i) => (
+                  <div key={i} className="flex items-center gap-3 text-[11px] font-mono">
+                    <span className="text-white/30 w-12">{r.type}</span>
+                    <span className="text-white/50 w-10">{r.name}</span>
+                    <span className="text-primary flex-1">{r.value}</span>
+                    <button onClick={() => copyText(r.value)} className="text-white/30 hover:text-white transition-colors"><Copy className="w-3 h-3" /></button>
                   </div>
                 ))}
-                <p className="text-xs text-muted-foreground/60 mt-2">DNS changes propagate within 24–48 hours.</p>
               </div>
             )}
-
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setLaunchDialogOpen(false)} className="flex-1 border-white/20 text-white rounded-none font-mono text-xs">
-                CANCEL
-              </Button>
-              <Button
-                onClick={handleConfirmLaunch}
-                disabled={launchSite.isPending || !launchDomain.trim()}
-                className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-none font-mono text-xs gap-2"
-              >
-                <Play className="w-3 h-3 fill-current" />
-                {launchSite.isPending ? "LAUNCHING..." : "CONFIRM LAUNCH"}
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setLaunchOpen(false)} className="flex-1 border-white/10 text-white rounded-none font-mono text-xs">Cancel</Button>
+              <Button onClick={handleLaunch} disabled={!launchDomain.trim() || launchSite.isPending} className="flex-1 bg-primary text-[#0a0a10] hover:bg-primary/90 rounded-none font-mono text-xs font-bold">
+                {launchSite.isPending ? "Launching…" : "Confirm Launch"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ── POST-LAUNCH DNS CARD ── */}
-      {launchedDomain && (
-        <div className="absolute bottom-6 right-6 max-w-sm bg-card border border-primary/30 p-5 shadow-xl z-50">
-          <div className="flex items-center gap-2 text-primary font-mono text-xs mb-3">
-            <CheckCircle2 className="w-4 h-4" /> SITE IS LIVE
-          </div>
-          <p className="text-white text-sm font-bold mb-1">{site?.projectName}</p>
-          <p className="text-muted-foreground text-xs mb-4 font-mono">{launchedDomain}</p>
-          <p className="text-xs text-muted-foreground mb-3">Point your domain registrar DNS to complete setup:</p>
-          <div className="text-xs font-mono space-y-1">
-            <div className="flex justify-between gap-4 text-muted-foreground">
-              <span>A record →</span><span className="text-primary">76.76.21.21</span>
-            </div>
-            <div className="flex justify-between gap-4 text-muted-foreground">
-              <span>CNAME →</span><span className="text-primary">cname.vercel-dns.com</span>
-            </div>
-          </div>
-          <button onClick={() => setLaunchedDomain(null)} className="text-xs text-muted-foreground hover:text-white mt-4 font-mono transition-colors">DISMISS</button>
-        </div>
+      {/* ── SETTINGS DIALOG ── */}
+      {site && (
+        <SiteSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} site={site} updateSite={updateSite} queryClient={queryClient} />
       )}
     </div>
   );
 }
 
-function PageEditor({ page, siteId, updatePage, queryClient }: any) {
-  const [content, setContent] = useState(page.content);
-  const [title, setTitle] = useState(page.title);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    setContent(page.content);
-    setTitle(page.title);
-  }, [page.id]);
-
-  const handleSave = () => {
-    updatePage.mutate({ id: siteId, pageId: page.id, data: { content, title } }, {
-      onSuccess: () => {
-        toast({ title: "Saved" });
-        queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(siteId) });
-      }
-    });
-  };
-
-  const hasChanges = content !== page.content || title !== page.title;
-
-  return (
-    <div className="flex-1 flex flex-col relative z-10">
-      <div className="h-10 bg-[#18181f] border-b border-border flex items-center px-4 justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          <FileCode className="w-4 h-4 text-primary shrink-0" />
-          <Input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="h-7 bg-transparent border-transparent hover:border-border focus:border-primary text-sm font-mono rounded-none w-52 px-2"
-          />
-          {hasChanges && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Unsaved changes" />}
-        </div>
-        <Button onClick={handleSave} disabled={updatePage.isPending || !hasChanges} size="sm" className="h-7 bg-primary text-primary-foreground hover:bg-primary/90 rounded-none font-mono text-xs gap-1.5 disabled:opacity-30">
-          <Save className="w-3 h-3" /> SAVE
-        </Button>
-      </div>
-      <div className="flex-1 p-4 overflow-hidden flex flex-col">
-        <Textarea
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          className="flex-1 bg-[#0a0a10] border-border text-[#d4d4d4] font-mono text-sm p-6 resize-none rounded-none focus-visible:ring-1 focus-visible:ring-primary/50"
-          spellCheck={false}
-          placeholder="Write page content, HTML, or notes here..."
-        />
-      </div>
-    </div>
-  );
-}
-
-function SiteSettingsPanel({ site, updateSite, queryClient }: any) {
-  const [data, setData] = useState({
-    projectName: site.projectName,
-    clientName: site.clientName,
-    domain: site.domain || "",
-    clientEmail: site.clientEmail || "",
-    description: site.description || "",
-    status: site.status,
-  });
+function SiteSettingsDialog({ open, onClose, site, updateSite, queryClient }: any) {
+  const [domain, setDomain] = useState(site.domain || "");
+  const [clientEmail, setClientEmail] = useState(site.clientEmail || "");
+  const [status, setStatus] = useState(site.status);
   const { toast } = useToast();
 
   const handleSave = () => {
-    updateSite.mutate({ id: site.id, data }, {
+    updateSite.mutate({ id: site.id, data: { domain, clientEmail, status } }, {
       onSuccess: () => {
         toast({ title: "Settings saved" });
         queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(site.id) });
-      }
+        onClose();
+      },
     });
   };
 
   return (
-    <div className="p-4 space-y-5">
-      <div className="space-y-4">
-        {[
-          { label: "Project Name", key: "projectName", placeholder: "My Client Site" },
-          { label: "Client Name", key: "clientName", placeholder: "Client Company Inc." },
-        ].map(({ label, key, placeholder }) => (
-          <div key={key}>
-            <label className="text-xs font-mono text-muted-foreground uppercase mb-2 block">{label}</label>
-            <Input value={(data as any)[key]} onChange={e => setData({ ...data, [key]: e.target.value })} placeholder={placeholder} className="bg-background border-border rounded-none h-9 text-sm" />
-          </div>
-        ))}
-
-        <div>
-          <label className="text-xs font-mono text-muted-foreground uppercase mb-2 block">Domain</label>
-          <Input value={data.domain} onChange={e => setData({ ...data, domain: e.target.value })} placeholder="www.example.com" className="bg-background border-border rounded-none h-9 text-sm font-mono" />
-          <p className="text-[10px] text-muted-foreground/60 mt-1">Used when launching the site</p>
-        </div>
-
-        <div>
-          <label className="text-xs font-mono text-muted-foreground uppercase mb-2 block">Client Email</label>
-          <Input value={data.clientEmail} onChange={e => setData({ ...data, clientEmail: e.target.value })} placeholder="client@company.com" className="bg-background border-border rounded-none h-9 text-sm" />
-          <p className="text-[10px] text-muted-foreground/60 mt-1">Links this site to the client's portal account</p>
-        </div>
-
-        <div>
-          <label className="text-xs font-mono text-muted-foreground uppercase mb-2 block">Status</label>
-          <select
-            value={data.status}
-            onChange={e => setData({ ...data, status: e.target.value })}
-            className="w-full bg-background border border-border text-white text-sm h-9 px-3 rounded-none focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="draft">Draft</option>
-            <option value="building">Building</option>
-            <option value="review">Review</option>
-            <option value="paused">Paused</option>
-            {site.status === "live" && <option value="live">Live</option>}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-xs font-mono text-muted-foreground uppercase mb-2 block">Description</label>
-          <Textarea value={data.description} onChange={e => setData({ ...data, description: e.target.value })} className="bg-background border-border rounded-none text-sm resize-y min-h-[80px]" />
-        </div>
-      </div>
-
-      <Button onClick={handleSave} disabled={updateSite.isPending} className="w-full bg-white/10 hover:bg-white/20 text-white rounded-none font-mono text-xs h-9">
-        {updateSite.isPending ? "SAVING..." : "SAVE SETTINGS"}
-      </Button>
-
-      <div className="pt-4 border-t border-border">
-        <div className="text-xs text-muted-foreground font-mono mb-2">METADATA</div>
-        <div className="text-xs text-muted-foreground space-y-2">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-sm bg-[#252526] border-white/10 rounded-none text-white">
+        <DialogHeader>
+          <DialogTitle className="font-mono text-sm flex items-center gap-2"><Settings className="w-4 h-4" /> Site Settings</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
           {[
-            { label: "Site ID", value: site.id },
-            { label: "Stack", value: site.tech },
-            { label: "Quote ID", value: site.quoteId || "N/A" },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex justify-between">
-              <span>{label}</span><span className="text-white">{value}</span>
+            { label: "Domain", value: domain, set: setDomain, placeholder: "www.example.com" },
+            { label: "Client Email", value: clientEmail, set: setClientEmail, placeholder: "client@company.com" },
+          ].map(({ label, value, set, placeholder }) => (
+            <div key={label}>
+              <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5 block">{label}</label>
+              <Input value={value} onChange={e => set(e.target.value)} placeholder={placeholder} className="bg-[#1e1e1e] border-white/10 rounded-none font-mono text-white h-9 text-sm" />
             </div>
           ))}
+          <div>
+            <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5 block">Status</label>
+            <select value={status} onChange={e => setStatus(e.target.value)}
+              className="w-full bg-[#1e1e1e] border border-white/10 text-white text-sm h-9 px-3 font-mono rounded-none focus:outline-none">
+              {["draft", "building", "review", "paused", ...(site.status === "live" ? ["live"] : [])].map(s => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={onClose} className="flex-1 border-white/10 text-white rounded-none font-mono text-xs">Cancel</Button>
+            <Button onClick={handleSave} disabled={updateSite.isPending} className="flex-1 bg-primary text-[#0a0a10] hover:bg-primary/90 rounded-none font-mono text-xs font-bold">
+              {updateSite.isPending ? "Saving…" : "Save"}
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

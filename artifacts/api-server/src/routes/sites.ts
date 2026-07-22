@@ -1,6 +1,7 @@
+import jwt from "jsonwebtoken";
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { getAuth } from "@clerk/express";
+
 import { db, sitesTable, sitePagesTable, activityLogTable } from "@workspace/db";
 import {
   CreateSiteBody,
@@ -18,19 +19,17 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret";
 
-const requireAuth = (req: any, res: any, next: any) => {
-  const auth = getAuth(req);
-  const userId = auth?.sessionClaims?.userId || auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  next();
+const requireAdminAuth = (req: any, res: any, next: any) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try { jwt.verify(auth.slice(7), JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: "Invalid or expired token" }); }
 };
 
 // List all sites (admin only)
-router.get("/sites", requireAuth, async (req, res): Promise<void> => {
+router.get("/sites", requireAdminAuth, async (req, res): Promise<void> => {
   const { status } = req.query as { status?: string };
   const sites = await db
     .select()
@@ -45,7 +44,7 @@ router.get("/sites", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Create a site (admin only)
-router.post("/sites", requireAuth, async (req, res): Promise<void> => {
+router.post("/sites", requireAdminAuth, async (req, res): Promise<void> => {
   const parsed = CreateSiteBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -68,7 +67,7 @@ router.post("/sites", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Get a site (admin only)
-router.get("/sites/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/sites/:id", requireAdminAuth, async (req, res): Promise<void> => {
   const params = GetSiteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -89,7 +88,7 @@ router.get("/sites/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Update a site (admin only)
-router.patch("/sites/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/sites/:id", requireAdminAuth, async (req, res): Promise<void> => {
   const params = UpdateSiteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -124,7 +123,7 @@ router.patch("/sites/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Delete a site (admin only)
-router.delete("/sites/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/sites/:id", requireAdminAuth, async (req, res): Promise<void> => {
   const params = DeleteSiteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -145,7 +144,7 @@ router.delete("/sites/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Launch a site (admin only)
-router.post("/sites/:id/launch", requireAuth, async (req, res): Promise<void> => {
+router.post("/sites/:id/launch", requireAdminAuth, async (req, res): Promise<void> => {
   const params = LaunchSiteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -174,7 +173,7 @@ router.post("/sites/:id/launch", requireAuth, async (req, res): Promise<void> =>
 });
 
 // List site pages (admin only)
-router.get("/sites/:id/pages", requireAuth, async (req, res): Promise<void> => {
+router.get("/sites/:id/pages", requireAdminAuth, async (req, res): Promise<void> => {
   const params = ListSitePagesParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -191,7 +190,7 @@ router.get("/sites/:id/pages", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Create a site page (admin only)
-router.post("/sites/:id/pages", requireAuth, async (req, res): Promise<void> => {
+router.post("/sites/:id/pages", requireAdminAuth, async (req, res): Promise<void> => {
   const params = CreateSitePageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -213,7 +212,7 @@ router.post("/sites/:id/pages", requireAuth, async (req, res): Promise<void> => 
 });
 
 // Update a site page (admin only)
-router.patch("/sites/:id/pages/:pageId", requireAuth, async (req, res): Promise<void> => {
+router.patch("/sites/:id/pages/:pageId", requireAdminAuth, async (req, res): Promise<void> => {
   const params = UpdateSitePageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -246,7 +245,7 @@ router.patch("/sites/:id/pages/:pageId", requireAuth, async (req, res): Promise<
 });
 
 // Delete a site page (admin only)
-router.delete("/sites/:id/pages/:pageId", requireAuth, async (req, res): Promise<void> => {
+router.delete("/sites/:id/pages/:pageId", requireAdminAuth, async (req, res): Promise<void> => {
   const params = DeleteSitePageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

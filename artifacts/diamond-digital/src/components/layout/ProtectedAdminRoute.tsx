@@ -1,17 +1,21 @@
-import { Show } from "@clerk/react";
+import { ReactNode } from "react";
 import { Redirect } from "wouter";
 import { AdminLayout } from "./AdminLayout";
-import { ReactNode } from "react";
+
+function isAdminTokenValid(): boolean {
+  try {
+    const token = localStorage.getItem("admin_token");
+    if (!token) return false;
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
 
 export function ProtectedAdminRoute({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <Show when="signed-in">
-        <AdminLayout>{children}</AdminLayout>
-      </Show>
-      <Show when="signed-out">
-        <Redirect to="/sign-in" />
-      </Show>
-    </>
-  );
+  if (!isAdminTokenValid()) {
+    return <Redirect to="/admin/login" />;
+  }
+  return <AdminLayout>{children}</AdminLayout>;
 }

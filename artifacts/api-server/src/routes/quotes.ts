@@ -1,6 +1,7 @@
+import jwt from "jsonwebtoken";
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { getAuth } from "@clerk/express";
+
 import { db, quotesTable, activityLogTable } from "@workspace/db";
 import {
   CreateQuoteBody,
@@ -11,19 +12,17 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret";
 
-const requireAuth = (req: any, res: any, next: any) => {
-  const auth = getAuth(req);
-  const userId = auth?.sessionClaims?.userId || auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  next();
+const requireAdminAuth = (req: any, res: any, next: any) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try { jwt.verify(auth.slice(7), JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: "Invalid or expired token" }); }
 };
 
 // List all quotes (admin only)
-router.get("/quotes", requireAuth, async (req, res): Promise<void> => {
+router.get("/quotes", requireAdminAuth, async (req, res): Promise<void> => {
   const { status } = req.query as { status?: string };
   let query = db.select().from(quotesTable).orderBy(quotesTable.createdAt);
   const quotes = await db
@@ -63,7 +62,7 @@ router.post("/quotes", async (req, res): Promise<void> => {
 });
 
 // Get a single quote (admin only)
-router.get("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/quotes/:id", requireAdminAuth, async (req, res): Promise<void> => {
   const params = GetQuoteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -84,7 +83,7 @@ router.get("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Update a quote (admin only)
-router.patch("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/quotes/:id", requireAdminAuth, async (req, res): Promise<void> => {
   const params = UpdateQuoteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -119,7 +118,7 @@ router.patch("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Delete a quote (admin only)
-router.delete("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/quotes/:id", requireAdminAuth, async (req, res): Promise<void> => {
   const params = DeleteQuoteParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
