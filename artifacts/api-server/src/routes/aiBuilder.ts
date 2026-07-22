@@ -12,42 +12,33 @@ const requireAdminAuth = (req: any, res: any, next: any) => {
   catch { res.status(401).json({ error: "Invalid or expired token" }); }
 };
 
-const SYSTEM_PROMPT = `You are an elite web designer who builds visually stunning, human-crafted websites. You write real copy — not placeholders.
+// Delimiter-based format — avoids JSON escaping issues with HTML/CSS/JS content
+const SYSTEM_PROMPT = `You are an elite web designer. Output ONLY the following format, nothing else:
 
-OUTPUT RULES (non-negotiable):
-- Return ONLY a raw JSON object: { "html": "...", "css": "...", "js": "..." }
-- No markdown, no backticks, no commentary. Start with { end with }
-- HTML links to style.css via <link rel="stylesheet" href="style.css"> and script.js via <script src="script.js"></script>
-- You MAY use Google Fonts CDN links in the HTML <head>
+<<<HTML>>>
+(complete HTML file here)
+<<<CSS>>>
+(complete CSS file here)
+<<<JS>>>
+(complete JavaScript here)
+<<<END>>>
 
-DESIGN RULES — make it look human and premium:
-- Pick a distinctive font pairing from Google Fonts (e.g. Playfair Display + Inter, Bebas Neue + Outfit, DM Serif Display + DM Sans)
-- Use a cohesive color palette with at least one strong accent color — never pure white on pure black unless the concept demands it
-- Generous whitespace, clear typographic hierarchy, subtle micro-animations (CSS only: fade-in, slide-up, hover lifts)
-- Grid or asymmetric layouts — avoid boring single-column everything
-- Real CSS custom properties (--color-primary, --font-heading, etc.)
+Rules:
+- HTML must include <link rel="stylesheet" href="style.css"> and <script src="script.js"></script>
+- You may use Google Fonts CDN in the HTML <head>
+- Write REAL copy — no Lorem ipsum, no placeholders, no "[Company Name]"
+- Build a complete, polished, professional website
+- CSS: beautiful modern design, strong color palette, fully responsive, smooth animations
+- JS: mobile nav toggle, smooth scroll, IntersectionObserver fade-in
+- Output ONLY the delimited sections above — no commentary, no markdown fences`;
 
-COPY RULES — no AI tells:
-- NEVER write "Welcome to [Business Name]" — write a real punchy headline instead
-- NEVER write placeholder copy like "Your text here", "Lorem ipsum", or "[Description]"
-- Invent a real-sounding business name, real services, real testimonials with full names, real prices if applicable
-- Write like a copywriter: short punchy hero headline (max 8 words), supporting sub (1–2 sentences), specific CTAs
-
-SECTIONS to include (pick what makes sense for the type of site):
-- Sticky header/nav with logo + links + mobile hamburger menu
-- Hero with a strong headline, subtext, and at least one CTA button
-- Features/Services section with icons (use CSS shapes or Unicode symbols — no external icon libraries)
-- Social proof (client logos as text, OR testimonials with real names and companies)
-- CTA banner section
-- Footer with links, copyright
-
-JS RULES:
-- Mobile hamburger menu toggle
-- Smooth scroll on all anchor links
-- Fade-in on scroll (IntersectionObserver)
-- Optional: counter animation, parallax, tab switching, FAQ accordion — whatever fits the site
-
-Keep the HTML, CSS, and JS concise but complete. Prioritize quality over length.`;
+function parseDelimited(raw: string): { html: string; css: string; js: string } | null {
+  const html = raw.match(/<<<HTML>>>([\s\S]*?)<<<CSS>>>/)?.[1]?.trim();
+  const css  = raw.match(/<<<CSS>>>([\s\S]*?)<<<JS>>>/)?.[1]?.trim();
+  const js   = raw.match(/<<<JS>>>([\s\S]*?)<<<END>>>/)?.[1]?.trim();
+  if (!html) return null;
+  return { html, css: css || "", js: js || "" };
+}
 
 router.post("/admin/ai/generate", requireAdminAuth, async (req: any, res: any): Promise<void> => {
   const { description, existingFiles } = req.body;
@@ -58,46 +49,47 @@ router.post("/admin/ai/generate", requireAdminAuth, async (req: any, res: any): 
   }
 
   try {
-    let userMessage = `Build a website for: ${description}
-
-Make it look like it was designed by a professional agency — distinctive, polished, and real. Not a template.`;
+    let userMessage = `Build a website: ${description}`;
 
     if (existingFiles && existingFiles.length > 0) {
       const filesText = existingFiles
         .map((f: any) => `### ${f.name}:\n${f.content}`)
         .join("\n\n");
-      userMessage = `Current website files:\n\n${filesText}\n\nUser request: ${description}\n\nUpdate the website. Keep what's good, improve or replace what the request asks for. Return the complete updated files.`;
+      userMessage = `Current files:\n\n${filesText}\n\nRequest: ${description}\n\nReturn the complete updated HTML, CSS, and JS in the required format.`;
     }
 
     const response = await openai.chat.completions.create({
       model: "gpt-5.6-terra",
-      max_completion_tokens: 6000,
+      max_completion_tokens: 8192,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
     });
 
-    const content = response.choices[0]?.message?.content || "";
+    const content = response.choices[0]?.message?.content ?? "";
+    const finishReason = response.choices[0]?.finish_reason;
 
-    // Strip any accidental markdown fences
-    const stripped = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
-    const jsonMatch = stripped.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("AI raw output:", content.slice(0, 500));
-      res.status(500).json({ error: "AI returned an unexpected format. Please try again." });
+    console.log(`AI finish_reason: ${finishReason}, content length: ${content.length}`);
+
+    if (!content) {
+      console.error("AI returned empty content. Full response:", JSON.stringify(response));
+      res.status(500).json({ error: "AI returned an empty response. Please try again." });
       return;
     }
 
-    const files = JSON.parse(jsonMatch[0]);
-    if (!files.html) {
-      res.status(500).json({ error: "AI response was incomplete. Please try again." });
+    const files = parseDelimited(content);
+
+    if (!files) {
+      // Fallback: try to find any HTML in the response
+      console.error("Delimiter parse failed. Raw output (first 600 chars):", content.slice(0, 600));
+      res.status(500).json({ error: "AI returned an unexpected format. Please try again." });
       return;
     }
 
     res.json({ success: true, files });
   } catch (err: any) {
-    console.error("AI generate error:", err);
+    console.error("AI generate error:", err?.message || err);
     res.status(500).json({ error: err.message || "AI generation failed" });
   }
 });
