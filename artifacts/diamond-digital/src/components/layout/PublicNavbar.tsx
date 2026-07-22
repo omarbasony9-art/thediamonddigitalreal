@@ -36,7 +36,7 @@ export function PublicNavbar() {
             className="w-7 h-7 sm:w-8 sm:h-8 group-hover:scale-110 transition-transform duration-300"
           />
           <span className="font-display font-bold text-base sm:text-xl tracking-wider text-white">
-            SOFTWARE<span className="text-primary">DIAMOND</span>
+            DIAMOND<span className="text-primary">DIGITAL</span>
           </span>
         </Link>
 
