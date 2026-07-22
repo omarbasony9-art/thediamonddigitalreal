@@ -1228,7 +1228,7 @@ export default function SiteBuilder() {
 
       {/* ── DEPLOY DIALOG ── */}
       <Dialog open={deployOpen} onOpenChange={setDeployOpen}>
-        <DialogContent className="sm:max-w-md bg-[#1a1a1a] border-white/10 rounded-xl text-white p-0 overflow-y-auto max-h-[90vh]">
+        <DialogContent className="sm:max-w-xl bg-[#1a1a1a] border-white/10 rounded-xl text-white p-0 overflow-y-auto max-h-[90vh]">
           {deployStep === "live" ? (
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
