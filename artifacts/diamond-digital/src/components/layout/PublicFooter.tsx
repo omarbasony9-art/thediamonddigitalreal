@@ -7,7 +7,7 @@ export function PublicFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-6">
-              <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="DiamondDigital Logo" className="w-8 h-8 opacity-80" />
+              <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Software Diamond Logo" className="w-8 h-8 opacity-80" />
               <span className="font-display font-bold text-xl tracking-wider text-white">
                 DIAMOND<span className="text-primary">DIGITAL</span>
               </span>
@@ -37,7 +37,7 @@ export function PublicFooter() {
         </div>
         
         <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} DiamondDigital. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Software Diamond. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>

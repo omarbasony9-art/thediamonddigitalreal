@@ -29,7 +29,7 @@ export function PublicNavbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 glass-panel border-b-0 border-white/5">
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="DiamondDigital Logo" className="w-8 h-8 group-hover:scale-110 transition-transform duration-300" />
+          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Software Diamond Logo" className="w-8 h-8 group-hover:scale-110 transition-transform duration-300" />
           <span className="font-display font-bold text-xl tracking-wider text-white">
             DIAMOND<span className="text-primary">DIGITAL</span>
           </span>

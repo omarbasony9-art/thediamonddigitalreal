@@ -40,7 +40,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <div className="w-64 border-r border-border bg-card flex flex-col h-[100dvh] sticky top-0">
         <div className="h-16 flex items-center px-6 border-b border-border">
           <Link href="/admin" className="flex items-center gap-2 group">
-            <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="DiamondDigital" className="w-6 h-6" />
+            <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Software Diamond" className="w-6 h-6" />
             <span className="font-display font-bold text-sm tracking-widest text-white">CONSOLE</span>
           </Link>
         </div>

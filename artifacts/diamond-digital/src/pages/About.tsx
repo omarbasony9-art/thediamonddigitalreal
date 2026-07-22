@@ -103,7 +103,7 @@ export default function About() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <p className="text-xs font-mono text-primary tracking-widest mb-4 uppercase">About DiamondDigital</p>
+            <p className="text-xs font-mono text-primary tracking-widest mb-4 uppercase">About Software Diamond</p>
             <h1 className="text-5xl md:text-6xl font-display font-black text-white mb-8 leading-tight">
               ENGINEERING <br />
               <span className="text-primary">DONE RIGHT.</span>
@@ -112,7 +112,7 @@ export default function About() {
               Most agencies build websites. We engineer software. The difference shows in performance, stability, and the fact that what we ship still works two years later without emergency patches.
             </p>
             <p className="text-muted-foreground leading-relaxed">
-              DiamondDigital was built by engineers who got tired of watching technically sound projects get buried under poor architecture decisions, vague requirements, and teams that hand off instead of own. We operate with a different model — small, senior, accountable.
+              Software Diamond was built by engineers who got tired of watching technically sound projects get buried under poor architecture decisions, vague requirements, and teams that hand off instead of own. We operate with a different model — small, senior, accountable.
             </p>
           </motion.div>
 
@@ -127,7 +127,7 @@ export default function About() {
             <div className="absolute w-48 h-48 bg-blue-500/10 blur-[60px] rounded-full" />
             <img
               src={`${import.meta.env.BASE_URL}logo.svg`}
-              alt="DiamondDigital"
+              alt="Software Diamond"
               className="relative w-64 h-64 md:w-80 md:h-80 opacity-20 drop-shadow-[0_0_60px_rgba(0,255,255,0.15)] select-none pointer-events-none"
             />
           </motion.div>

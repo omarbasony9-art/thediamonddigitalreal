@@ -45,7 +45,7 @@ export default function AdminSignIn() {
             <Shield className="w-6 h-6 text-primary" />
           </div>
           <h1 className="font-display text-2xl font-bold text-white tracking-widest">ADMIN CONSOLE</h1>
-          <p className="text-muted-foreground text-sm mt-2 font-mono">DiamondDigital · Restricted Access</p>
+          <p className="text-muted-foreground text-sm mt-2 font-mono">Software Diamond · Restricted Access</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

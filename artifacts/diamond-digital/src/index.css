@@ -48,7 +48,7 @@
 }
 
 :root {
-  /* Enforce dark mode as the only mode for DiamondDigital */
+  /* Enforce dark mode as the only mode for Software Diamond */
   --background: 240 20% 4%; /* Deep space black #08080C */
   --foreground: 0 0% 100%; /* Diamond white */
   
