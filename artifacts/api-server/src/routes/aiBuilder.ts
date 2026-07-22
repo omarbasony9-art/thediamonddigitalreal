@@ -84,6 +84,41 @@ REQUIRED:
 - A signature element that appears across all pages
 - One signature element consistent across all pages
 
+DESKTOP DESIGN — MUST BE EXCEPTIONAL (1024px+):
+The desktop experience is the flagship. It must feel like a premium, professionally designed site — not a stretched mobile layout.
+
+LAYOUT POWER MOVES for desktop:
+- Full-viewport hero sections with large typography (8vw–12vw headlines)
+- Asymmetric two-column layouts: text on one side, bold visual on the other
+- Horizontal scrolling sections or sticky scroll-triggered reveals
+- Side-by-side feature rows that alternate image/text alignment
+- Wide card grids (3–4 columns) with hover states and micro-animations
+- Fixed/sticky sidebars or navigation panels where appropriate
+- Generous negative space — large padding, breathing room
+- Full-bleed background sections with overlay content
+- CSS Grid for 2D layouts (not just flexbox rows)
+- Overlapping elements: text over images, cards that break grid lines
+
+TYPOGRAPHY at desktop scale:
+- Hero headline: min 6rem, ideally 8–12rem, one powerful word or phrase per line
+- Section titles: 3–5rem, weighted and intentional
+- Never let text span more than 65 characters wide (max-width: 65ch on body text)
+- Pull quotes or stat callouts in oversized type (4–6rem) used as design elements
+
+INTERACTIONS (CSS only, no JS required):
+- Smooth hover transitions on ALL interactive elements (0.2s–0.3s ease)
+- Card hover: translateY(-4px) + box-shadow lift
+- Button hover: background shift + subtle scale(1.02)
+- Nav links: underline slide-in from left
+- Image/placeholder: zoom on hover (scale 1.05, overflow hidden on wrapper)
+
+DESKTOP-SPECIFIC SECTIONS:
+- Hero: min-height 100vh, content centered or offset, massive type
+- Services/features: 3-column grid minimum, icon + heading + description
+- Testimonials: horizontal slider or large pull quote with author photo placeholder
+- About/team: side-by-side with large image placeholder taking 50% width
+- CTA section: full-bleed background, centered large text, prominent button
+
 ════════════════════════════════════════
 BUILDING — TECHNICAL RULES (NON-NEGOTIABLE)
 ════════════════════════════════════════
