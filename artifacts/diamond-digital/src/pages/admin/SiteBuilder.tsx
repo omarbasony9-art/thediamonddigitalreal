@@ -23,6 +23,7 @@ type AiMsg =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; files?: string[] }
   | { role: "thinking" }
+  | { role: "queued"; text: string; position: number }
   | { role: "welcome" };
 
 const getLang = (slug: string) => {
@@ -135,6 +136,9 @@ export default function SiteBuilder() {
   const [aiMessages, setAiMessages] = useState<AiMsg[]>([{ role: "welcome" }]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [queueLength, setQueueLength] = useState(0);
+  const messageQueueRef = useRef<string[]>([]);
+  const aiLoadingRef = useRef(false); // sync ref mirrors aiLoading for use inside async callbacks
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<typeof pages>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -295,19 +299,16 @@ export default function SiteBuilder() {
     });
   };
 
-  const handleAiSend = async (overridePrompt?: string) => {
-    const prompt = (overridePrompt ?? aiInput).trim();
-    if (!prompt || aiLoading) return;
-    setAiInput("");
-
+  // Core AI execution — always runs one prompt immediately
+  const runAiPrompt = async (prompt: string) => {
     const currentPages = pagesRef.current || [];
-    // Send current in-memory content (including unsaved edits) so AI sees the latest state
     const existingFiles = currentPages.map((p) => ({
       name: p.slug,
       content: editMapRef.current.has(p.id) ? editMapRef.current.get(p.id)! : p.content,
     }));
 
     setAiMessages((prev) => [...prev, { role: "user", text: prompt }, { role: "thinking" }]);
+    aiLoadingRef.current = true;
     setAiLoading(true);
 
     try {
@@ -324,7 +325,6 @@ export default function SiteBuilder() {
       const fileList: { name: string; content: string }[] = data.files;
       const createdNames: string[] = [];
 
-      // Upsert all returned files sequentially
       for (const file of fileList) {
         const existing = currentPages.find((p) => p.slug === file.name);
         await new Promise<void>((resolve) => {
@@ -345,20 +345,15 @@ export default function SiteBuilder() {
 
       await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
 
-      // Load AI output into edit map so preview updates immediately without waiting for DB refetch
       const freshPages = pagesRef.current || currentPages;
       const nameToContent = Object.fromEntries(fileList.map((f) => [f.name, f.content]));
       for (const p of freshPages) {
-        if (nameToContent[p.slug] !== undefined) {
-          editMapRef.current.set(p.id, nameToContent[p.slug]);
-        }
+        if (nameToContent[p.slug] !== undefined) editMapRef.current.set(p.id, nameToContent[p.slug]);
       }
       bumpEditMap();
 
-      // Switch to index.html
       const htmlPage = freshPages.find((p) => p.slug === "index.html") || freshPages.find((p) => p.slug.endsWith(".html"));
       if (htmlPage) setActiveFileId(htmlPage.id);
-
       setPreviewKey((k) => k + 1);
 
       setAiMessages((prev) => {
@@ -377,7 +372,34 @@ export default function SiteBuilder() {
         return copy;
       });
     } finally {
+      aiLoadingRef.current = false;
       setAiLoading(false);
+      // Process next queued message automatically
+      const next = messageQueueRef.current.shift();
+      setQueueLength(messageQueueRef.current.length);
+      if (next) {
+        // Remove the "queued" bubble for this message now that it's starting
+        setAiMessages((prev) => prev.filter((m) => !(m.role === "queued" && (m as any).text === next)));
+        // Small delay so the UI settles before the next request starts
+        setTimeout(() => runAiPrompt(next), 150);
+      }
+    }
+  };
+
+  const handleAiSend = (overridePrompt?: string) => {
+    const prompt = (overridePrompt ?? aiInput).trim();
+    if (!prompt) return;
+    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+    setAiInput("");
+
+    if (aiLoadingRef.current) {
+      // Queue it — show a "queued" bubble so the user knows it's pending
+      messageQueueRef.current.push(prompt);
+      const pos = messageQueueRef.current.length;
+      setQueueLength(pos);
+      setAiMessages((prev) => [...prev, { role: "queued", text: prompt, position: pos } as AiMsg]);
+    } else {
+      runAiPrompt(prompt);
     }
   };
 
@@ -580,9 +602,14 @@ export default function SiteBuilder() {
             </div>
             <span className="text-sm font-semibold text-white">AI</span>
             <span className="text-[10px] font-mono text-white/25 ml-0.5">gpt‑5.6‑terra</span>
+            {queueLength > 0 && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-[9px] font-mono text-amber-400">
+                {queueLength} queued
+              </span>
+            )}
             <div className="flex-1" />
             <button
-              onClick={() => setAiMessages([{ role: "welcome" }])}
+              onClick={() => { setAiMessages([{ role: "welcome" }]); messageQueueRef.current = []; setQueueLength(0); }}
               className="w-7 h-7 flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/6 rounded transition-colors"
               title="New conversation"
             >
@@ -598,7 +625,7 @@ export default function SiteBuilder() {
           </div>
 
           <div className="p-3 border-t border-white/6 shrink-0">
-            <div className={`bg-[#1e1e1e] border rounded-xl overflow-hidden transition-colors ${aiLoading ? "border-white/10" : "border-white/12 focus-within:border-[#0066ff]/60"}`}>
+            <div className="bg-[#1e1e1e] border border-white/12 focus-within:border-[#0066ff]/60 rounded-xl overflow-hidden transition-colors">
               <textarea
                 ref={textareaRef}
                 value={aiInput}
@@ -606,21 +633,22 @@ export default function SiteBuilder() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiSend(); }
                 }}
-                placeholder="Ask AI to build or change anything…"
+                placeholder={aiLoading ? "Type to queue next message…" : "Ask AI to build or change anything…"}
                 rows={1}
-                disabled={aiLoading}
-                className="w-full bg-transparent px-3 pt-3 pb-1 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none disabled:opacity-50 leading-relaxed"
+                className="w-full bg-transparent px-3 pt-3 pb-1 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none leading-relaxed"
                 style={{ minHeight: "40px", maxHeight: "160px" }}
               />
               <div className="flex items-center justify-between px-3 pb-2 pt-1">
-                <span className="text-[10px] text-white/20 font-mono">⏎ send · ⇧⏎ newline</span>
+                <span className="text-[10px] text-white/20 font-mono">
+                  {aiLoading ? "will queue after current task" : "⏎ send · ⇧⏎ newline"}
+                </span>
                 <button
                   onClick={() => handleAiSend()}
-                  disabled={!aiInput.trim() || aiLoading}
+                  disabled={!aiInput.trim()}
                   className="w-7 h-7 flex items-center justify-center bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors"
                 >
                   {aiLoading
-                    ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                    ? <Send className="w-3.5 h-3.5 text-white" />
                     : <Send className="w-3.5 h-3.5 text-white" />}
                 </button>
               </div>
@@ -719,6 +747,22 @@ function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string
             {["index.html", "about.html", "services.html", "style.css", "script.js"].map((f, i) => (
               <span key={f} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-white/25 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }}>{f}</span>
             ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.role === "queued") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] space-y-1">
+          <div className="bg-white/8 border border-white/10 rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm text-white/50 leading-relaxed">
+            {msg.text}
+          </div>
+          <div className="flex items-center justify-end gap-1 pr-1">
+            <div className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[10px] font-mono text-amber-400/70">queued #{msg.position}</span>
           </div>
         </div>
       </div>
