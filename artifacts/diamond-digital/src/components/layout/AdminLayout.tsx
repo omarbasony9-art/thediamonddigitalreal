@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Inbox, Globe, LogOut, Menu, X, PlusCircle } from "lucide-react";
+import { LayoutDashboard, Inbox, Globe, LogOut, Menu, X, PlusCircle, Home } from "lucide-react";
 
 function getAdminUsername(): string {
   try {
@@ -61,11 +61,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* ── Desktop sidebar ── */}
       <div className="hidden md:flex w-64 border-r border-border bg-card flex-col h-[100dvh] sticky top-0 shrink-0">
-        <div className="h-16 flex items-center px-6 border-b border-border">
+        <div className="h-16 flex items-center px-6 border-b border-border justify-between">
           <Link href="/admin" className="flex items-center gap-2 group">
             <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Diamond Digital" className="w-6 h-6" />
             <span className="font-display font-bold text-sm tracking-widest text-white">
-              SOFTWARE<span className="text-primary">DIAMOND</span>
+              DIAMOND<span className="text-primary">DIGITAL</span>
+            </span>
+          </Link>
+          <Link href="/" title="Back to site">
+            <span className="p-1.5 text-muted-foreground hover:text-white transition-colors rounded-md hover:bg-white/5 flex items-center justify-center">
+              <Home className="w-4 h-4" />
             </span>
           </Link>
         </div>
@@ -107,10 +112,13 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         <Link href="/admin" className="flex items-center gap-2">
           <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Diamond Digital" className="w-5 h-5" />
           <span className="font-display font-bold text-sm tracking-widest text-white">
-            SOFTWARE<span className="text-primary">DIAMOND</span>
+            DIAMOND<span className="text-primary">DIGITAL</span>
           </span>
         </Link>
         <div className="flex-1" />
+        <Link href="/" title="Back to site" className="p-2 text-muted-foreground hover:text-white transition-colors">
+          <Home className="w-4 h-4" />
+        </Link>
         <button onClick={handleSignOut} className="p-2 text-muted-foreground hover:text-destructive transition-colors" title="Sign out">
           <LogOut className="w-4 h-4" />
         </button>
@@ -125,12 +133,17 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               <Link href="/admin" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
                 <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="w-5 h-5" />
                 <span className="font-display font-bold text-sm tracking-widest text-white">
-                  SOFTWARE<span className="text-primary">DIAMOND</span>
+                  DIAMOND<span className="text-primary">DIGITAL</span>
                 </span>
               </Link>
-              <button onClick={() => setMobileOpen(false)} className="p-2 text-muted-foreground hover:text-white">
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <Link href="/" title="Back to site" onClick={() => setMobileOpen(false)} className="p-2 text-muted-foreground hover:text-white transition-colors">
+                  <Home className="w-4 h-4" />
+                </Link>
+                <button onClick={() => setMobileOpen(false)} className="p-2 text-muted-foreground hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="p-4 flex-1 flex flex-col gap-1">
               <Link href="/admin/new-project" onClick={() => setMobileOpen(false)}>
