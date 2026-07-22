@@ -9,8 +9,9 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, RefreshCw, Settings, Plus, Trash2, FileCode,
-  Copy, AlertTriangle, ChevronRight,
-  Sparkles, Send, Bot, Loader2, Files, Globe, CheckCircle2, ExternalLink,
+  Copy, AlertTriangle, ChevronRight, Sparkles, Send, Loader2,
+  Globe, CheckCircle2, ExternalLink, Eye, EyeOff, RotateCcw,
+  FileJson, FileCog, File,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 
 type FileItem = { id: number; title: string; slug: string; content: string; order: number };
-type AiMsg = { role: "user" | "ai" | "system"; text: string };
+type AiMsg =
+  | { role: "user"; text: string }
+  | { role: "assistant"; text: string; files?: string[] }
+  | { role: "thinking" }
+  | { role: "welcome" };
 
 const getLang = (slug: string) => {
   if (slug.endsWith(".html")) return "html";
@@ -29,12 +34,18 @@ const getLang = (slug: string) => {
   if (slug.endsWith(".md")) return "markdown";
   return "plaintext";
 };
-const getIcon = (slug: string) =>
-  slug.endsWith(".html") ? "🌐" : slug.endsWith(".css") ? "🎨" : slug.endsWith(".js") ? "⚡" : "📄";
+
+function FileIcon({ slug, className = "w-3.5 h-3.5" }: { slug: string; className?: string }) {
+  if (slug.endsWith(".html")) return <FileCode className={className} />;
+  if (slug.endsWith(".css")) return <FileCog className={`${className} text-blue-400`} />;
+  if (slug.endsWith(".js")) return <FileJson className={`${className} text-yellow-400`} />;
+  return <File className={className} />;
+}
 
 const buildPreview = (files: FileItem[]) => {
-  const html = files.find((f) => getLang(f.slug) === "html");
-  if (!html) return `<html><body style="font:14px system-ui;color:#666;padding:48px;text-align:center;background:#111"><p>No HTML file yet.</p></body></html>`;
+  const html = files.find((f) => getLang(f.slug) === "html" && f.slug === "index.html")
+    || files.find((f) => getLang(f.slug) === "html");
+  if (!html) return `<html><body style="font:14px system-ui;color:#666;padding:48px;text-align:center;background:#111"><p>No HTML file yet. Ask AI to build your site.</p></body></html>`;
   let doc = html.content;
   const styles = files.filter((f) => getLang(f.slug) === "css").map((f) => `<style>${f.content}</style>`).join("\n");
   const scripts = files.filter((f) => getLang(f.slug) === "javascript").map((f) => `<script>${f.content}<\/script>`).join("\n");
@@ -56,14 +67,14 @@ const STARTERS: Omit<FileItem, "id">[] = [
   <header class="header">
     <div class="logo">My Brand</div>
     <nav>
-      <a href="#about">About</a>
-      <a href="#services">Services</a>
-      <a href="#contact">Contact</a>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="services.html">Services</a>
     </nav>
   </header>
   <section class="hero">
     <h1>Build Something Amazing</h1>
-    <p>Describe your website to the AI on the left and watch it come to life in seconds.</p>
+    <p>Describe your website to the AI and watch it come to life.</p>
     <button class="btn">Get Started</button>
   </section>
   <footer><p>&copy; 2026 My Website</p></footer>
@@ -80,9 +91,16 @@ nav a:hover { color: #fff; }
 .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; margin-bottom: 1rem; background: linear-gradient(135deg, #fff 0%, #00cfff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .hero p { color: #888; font-size: 1.1rem; margin-bottom: 2rem; }
 .btn { background: #00cfff; color: #0f0f1a; border: none; padding: .85rem 2rem; font-size: .95rem; font-weight: 700; cursor: pointer; border-radius: 4px; }
-.btn:hover { opacity: .85; }
 footer { text-align: center; padding: 2rem; color: #555; border-top: 1px solid rgba(255,255,255,.06); }` },
   { title: "script.js", slug: "script.js", order: 2, content: `console.log('Site loaded!');` },
+];
+
+const SUGGESTIONS = [
+  "Dark barbershop with neon green & booking",
+  "Luxury real estate with full-screen hero",
+  "Minimalist SaaS with pricing table",
+  "Gym site with class schedule & trainers",
+  "Restaurant with menu & reservation form",
 ];
 
 export default function SiteBuilder() {
@@ -102,17 +120,15 @@ export default function SiteBuilder() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
 
-  const [leftTab, setLeftTab] = useState<"files" | "ai">("ai");
-  const [aiMessages, setAiMessages] = useState<AiMsg[]>([
-    { role: "system", text: "I build complete, professional websites from a single description.\n\nTry:\n• \"Dark barbershop with neon green accents, booking section & gallery\"\n• \"Luxury real estate agency with full-screen hero and property listings\"\n• \"Minimalist SaaS landing page with pricing table and testimonials\"\n• \"Gym website with bold typography, class schedule and trainer bios\"\n\nBe specific — the more detail you give, the better the result." },
-  ]);
+  const [aiMessages, setAiMessages] = useState<AiMsg[]>([{ role: "welcome" }]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiMode, setAiMode] = useState<"fresh" | "improve">("fresh");
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<typeof pages>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: site } = useGetSite(id, { query: { queryKey: getGetSiteQueryKey(id) } });
   const { data: pages, isLoading: pagesLoading } = useListSitePages(id, { query: { queryKey: getListSitePagesQueryKey(id) } });
@@ -138,13 +154,12 @@ export default function SiteBuilder() {
 
   useEffect(() => {
     if (pages && pages.length > 0 && activeFileId === null) {
-      const html = pages.find((p) => p.slug.endsWith(".html")) || pages[0];
+      const html = pages.find((p) => p.slug === "index.html") || pages.find((p) => p.slug.endsWith(".html")) || pages[0];
       setActiveFileId(html.id);
       setEditedContent(html.content);
     }
   }, [pages, activeFileId]);
 
-  // Debounced live preview
   useEffect(() => {
     if (!pages) return;
     clearTimeout(debounceRef.current);
@@ -161,10 +176,8 @@ export default function SiteBuilder() {
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
 
-  // Restore publishedUrl from site.domain if it looks like our hosted URL
   useEffect(() => {
-    if (site?.domain && site.domain.includes("/api/s/")) setPublishedUrl(site.domain);
-    else if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
+    if (site?.domain && site.domain.startsWith("http")) setPublishedUrl(site.domain);
   }, [site]);
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
@@ -204,7 +217,6 @@ export default function SiteBuilder() {
       setPublishedUrl(data.publishedUrl);
       setPublishOpen(true);
       queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
-      toast({ title: "🚀 Published!", description: "Your site is live." });
     } catch (err: any) {
       toast({ title: "Publish failed", description: err.message, variant: "destructive" });
     } finally {
@@ -218,7 +230,7 @@ export default function SiteBuilder() {
     if (!slug.includes(".")) slug += ".html";
     createPage.mutate(
       { id, data: { title: slug, slug, content: `<!-- ${slug} -->\n` } },
-      { onSuccess: (f) => { queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) }); setActiveFileId(f.id); setEditedContent(f.content); setNewFileName(""); setAddingFile(false); toast({ title: `Created ${slug}` }); } }
+      { onSuccess: (f) => { queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) }); setActiveFileId(f.id); setEditedContent(f.content); setNewFileName(""); setAddingFile(false); } }
     );
   };
 
@@ -230,20 +242,19 @@ export default function SiteBuilder() {
     });
   };
 
-  const handleAiSend = async () => {
-    const prompt = aiInput.trim();
+  const handleAiSend = async (overridePrompt?: string) => {
+    const prompt = (overridePrompt ?? aiInput).trim();
     if (!prompt || aiLoading) return;
     setAiInput("");
 
     const currentPages = pagesRef.current || [];
-    const existingFiles = aiMode === "improve"
-      ? currentPages.map((p) => ({ name: p.slug, content: p.id === activeFileId ? editedContent : p.content }))
-      : [];
+    // Always send existing files so AI knows the context
+    const existingFiles = currentPages.map((p) => ({ name: p.slug, content: p.id === activeFileId ? editedContent : p.content }));
 
     setAiMessages((prev) => [
       ...prev,
       { role: "user", text: prompt },
-      { role: "ai", text: "__loading__" },
+      { role: "thinking" },
     ]);
     setAiLoading(true);
 
@@ -258,54 +269,56 @@ export default function SiteBuilder() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Generation failed");
 
-      const { html, css, js } = data.files;
-      const fileMap: Record<string, string> = {
-        "index.html": html,
-        ...(css ? { "style.css": css } : {}),
-        ...(js ? { "script.js": js } : {}),
-      };
+      // data.files is now an array: [{ name, content }, ...]
+      const fileList: { name: string; content: string }[] = data.files;
+      const createdNames: string[] = [];
 
-      await Promise.all(
-        Object.entries(fileMap).map(([slug, content]) => {
-          const existing = currentPages.find((p) => p.slug === slug);
-          return new Promise<void>((resolve) => {
-            if (existing) {
-              updatePage.mutate({ id, pageId: existing.id, data: { content, title: existing.title } }, { onSuccess: () => resolve(), onError: () => resolve() });
-            } else {
-              createPage.mutate({ id, data: { title: slug, slug, content } }, { onSuccess: () => resolve(), onError: () => resolve() });
-            }
-          });
-        })
-      );
+      // Upsert all returned files sequentially (to avoid DB race)
+      for (const file of fileList) {
+        const existing = currentPages.find((p) => p.slug === file.name);
+        await new Promise<void>((resolve) => {
+          if (existing) {
+            updatePage.mutate(
+              { id, pageId: existing.id, data: { content: file.content, title: file.name } },
+              { onSuccess: () => resolve(), onError: () => resolve() }
+            );
+          } else {
+            createPage.mutate(
+              { id, data: { title: file.name, slug: file.name, content: file.content } },
+              { onSuccess: () => resolve(), onError: () => resolve() }
+            );
+          }
+        });
+        createdNames.push(file.name);
+      }
 
       await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
 
       const freshPages = pagesRef.current || currentPages;
-      const htmlPage = freshPages.find((p) => p.slug === "index.html");
-      if (htmlPage) { setActiveFileId(htmlPage.id); setEditedContent(html); }
+      const htmlPage = freshPages.find((p) => p.slug === "index.html") || freshPages.find((p) => p.slug.endsWith(".html"));
+      const htmlFile = fileList.find((f) => f.name === "index.html") || fileList.find((f) => f.name.endsWith(".html"));
+      if (htmlPage && htmlFile) { setActiveFileId(htmlPage.id); setEditedContent(htmlFile.content); }
 
-      const merged = freshPages.map((p) => {
-        if (p.slug === "index.html" && html) return { ...p, content: html };
-        if (p.slug === "style.css" && css) return { ...p, content: css };
-        if (p.slug === "script.js" && js) return { ...p, content: js };
-        return p;
-      });
+      // Build merged pages for preview
+      const mergedMap: Record<string, string> = {};
+      fileList.forEach((f) => { mergedMap[f.name] = f.content; });
+      const merged = freshPages.map((p) => mergedMap[p.slug] ? { ...p, content: mergedMap[p.slug] } : p);
       setPreviewDoc(buildPreview(merged as FileItem[]));
       setPreviewKey((k) => k + 1);
 
       setAiMessages((prev) => {
         const copy = [...prev];
         copy[copy.length - 1] = {
-          role: "ai",
-          text: "✅ Done! Your website is ready — check the preview on the right.\n\nWant to refine it? Switch to **Improve** mode and tell me what to change.",
+          role: "assistant",
+          text: `Here's your website! I created ${createdNames.length} files with full navigation between pages. You can edit any file directly or ask me to make changes.`,
+          files: createdNames,
         };
         return copy;
       });
-      toast({ title: "✨ Website built!" });
     } catch (err: any) {
       setAiMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = { role: "ai", text: `❌ ${err.message}. Please try again.` };
+        copy[copy.length - 1] = { role: "assistant", text: `❌ ${err.message}. Please try again.` };
         return copy;
       });
     } finally {
@@ -315,10 +328,17 @@ export default function SiteBuilder() {
 
   const isLive = site?.status === "live";
 
-  return (
-    <div className="h-screen w-full flex flex-col bg-[#1e1e1e] text-white overflow-hidden" style={{ fontFamily: "system-ui, sans-serif" }}>
+  // Auto-grow textarea
+  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setAiInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+  };
 
-      {/* TOP BAR */}
+  return (
+    <div className="h-screen w-full flex flex-col bg-[#0e0e0e] text-white overflow-hidden" style={{ fontFamily: "system-ui, sans-serif" }}>
+
+      {/* ── TOP BAR ── */}
       <div className="h-11 bg-[#161616] border-b border-white/8 flex items-center px-3 gap-2 shrink-0">
         <Link href="/admin/sites">
           <button className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 rounded transition-colors">
@@ -327,21 +347,23 @@ export default function SiteBuilder() {
         </Link>
         <div className="w-px h-4 bg-white/10" />
         <div className="flex items-center gap-1.5 text-sm min-w-0">
-          <span className="text-white/40 font-mono text-xs truncate">{site?.clientName}</span>
-          <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
+          <span className="text-white/35 font-mono text-xs truncate hidden sm:block">{site?.clientName}</span>
+          <ChevronRight className="w-3 h-3 text-white/20 shrink-0 hidden sm:block" />
           <span className="text-white font-semibold truncate">{site?.projectName || "Loading…"}</span>
         </div>
-        {isLive && (
-          <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider bg-emerald-500/20 text-emerald-400 shrink-0">LIVE</span>
-        )}
+        {isLive && <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded shrink-0">LIVE</span>}
         <div className="flex-1" />
-        <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 rounded transition-colors">
-          <Settings className="w-3.5 h-3.5" />
-        </button>
+        {/* Preview toggle */}
         <button
-          onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
-          className="flex items-center gap-1.5 px-2.5 h-7 bg-white/8 hover:bg-white/12 text-white/60 text-xs font-mono rounded transition-colors">
-          <RefreshCw className="w-3 h-3" /> Refresh
+          onClick={() => setShowPreview((v) => !v)}
+          className={`flex items-center gap-1.5 px-2.5 h-7 text-xs font-mono rounded transition-colors ${showPreview ? "bg-white/10 text-white" : "bg-white/5 text-white/40 hover:text-white/70"}`}
+          title={showPreview ? "Hide preview" : "Show preview"}
+        >
+          {showPreview ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+          <span className="hidden sm:inline">Preview</span>
+        </button>
+        <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center text-white/35 hover:text-white hover:bg-white/8 rounded transition-colors">
+          <Settings className="w-3.5 h-3.5" />
         </button>
         {hasUnsaved && (
           <button onClick={handleSave} disabled={updatePage.isPending}
@@ -351,248 +373,327 @@ export default function SiteBuilder() {
         )}
         {isLive && publishedUrl ? (
           <button onClick={() => setPublishOpen(true)}
-            className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 text-xs font-mono rounded transition-colors hover:bg-emerald-600/30">
+            className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded transition-colors hover:bg-emerald-600/30">
             <Globe className="w-3 h-3" /> View Live
           </button>
         ) : (
           <button onClick={handlePublish} disabled={publishing}
-            className="flex items-center gap-1.5 px-3 h-7 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-mono font-bold rounded transition-colors">
+            className="flex items-center gap-1.5 px-3 h-7 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-50 text-white text-xs font-mono font-bold rounded transition-colors">
             {publishing ? <><Loader2 className="w-3 h-3 animate-spin" /> Publishing…</> : <><Globe className="w-3 h-3" /> Publish</>}
           </button>
         )}
       </div>
 
-      {/* WORKSPACE */}
+      {/* ── WORKSPACE ── */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* LEFT PANEL */}
-        <div className={`flex flex-col border-r border-white/8 shrink-0 bg-[#1a1a2e] ${leftTab === "ai" ? "w-80" : "w-52"}`}>
-          <div className="flex border-b border-white/8 shrink-0">
-            <button onClick={() => setLeftTab("files")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-mono transition-colors flex-1 justify-center ${leftTab === "files" ? "text-white border-b-2 border-primary bg-[#252526]" : "text-white/40 hover:text-white/70"}`}>
-              <Files className="w-3.5 h-3.5" /> Files
-            </button>
-            <button onClick={() => setLeftTab("ai")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-mono transition-colors flex-1 justify-center ${leftTab === "ai" ? "text-violet-300 border-b-2 border-violet-400" : "text-white/40 hover:text-violet-300/70"}`}>
-              <Sparkles className="w-3.5 h-3.5" /> AI Builder
+        {/* FILE EXPLORER */}
+        <div className="w-44 shrink-0 bg-[#161616] border-r border-white/6 flex flex-col overflow-hidden">
+          <div className="px-3 py-2.5 flex items-center justify-between border-b border-white/5">
+            <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Files</span>
+            <button onClick={() => setAddingFile(true)} className="w-5 h-5 flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/8 rounded transition-colors">
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          {/* FILES */}
-          {leftTab === "files" && (
-            <div className="flex-1 bg-[#252526] overflow-y-auto">
-              <div className="px-3 py-2 text-[10px] font-mono text-white/30 uppercase tracking-widest border-b border-white/5 flex items-center justify-between">
-                <span>Explorer</span>
-                <button onClick={() => setAddingFile(true)} className="hover:text-white/60"><Plus className="w-3 h-3" /></button>
-              </div>
-              {pagesLoading ? (
-                <div className="px-4 py-3 text-xs text-white/30 font-mono">Loading…</div>
-              ) : pages?.map((file) => {
-                const active = file.id === activeFileId;
-                return (
-                  <div key={file.id} onClick={() => switchFile(file as FileItem)}
-                    className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${active ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}>
-                    <div className="flex items-center gap-2 text-xs font-mono truncate">
-                      <span className="shrink-0">{getIcon(file.slug)}</span>
-                      <span className="truncate">{file.slug}</span>
-                      {active && hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
-                    </div>
-                    <button onClick={(e) => handleDeleteFile(file.id, e)} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-all shrink-0 ml-1">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+          <div className="flex-1 overflow-y-auto py-1">
+            {pagesLoading ? (
+              <div className="px-3 py-2 text-[10px] text-white/25 font-mono">Loading…</div>
+            ) : pages?.map((file) => {
+              const active = file.id === activeFileId;
+              return (
+                <div key={file.id} onClick={() => switchFile(file as FileItem)}
+                  className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${active ? "bg-white/8 text-white" : "text-white/40 hover:bg-white/4 hover:text-white/70"}`}>
+                  <div className="flex items-center gap-2 text-[11px] font-mono truncate min-w-0">
+                    <FileIcon slug={file.slug} className="w-3 h-3 shrink-0 opacity-60" />
+                    <span className="truncate">{file.slug}</span>
+                    {active && hasUnsaved && <span className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />}
                   </div>
-                );
-              })}
-              {addingFile && (
-                <div className="px-3 py-2 border-t border-white/5">
-                  <Input autoFocus value={newFileName} onChange={(e) => setNewFileName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleAddFile(); if (e.key === "Escape") setAddingFile(false); }}
-                    placeholder="filename.html" className="h-6 text-xs font-mono bg-white/10 border-white/20 rounded-none px-2 text-white placeholder:text-white/30" />
-                  <div className="flex gap-2 mt-1.5">
-                    <button onClick={handleAddFile} className="text-[10px] font-mono text-primary hover:text-primary/80">Create</button>
-                    <button onClick={() => { setAddingFile(false); setNewFileName(""); }} className="text-[10px] font-mono text-white/30 hover:text-white/60">Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* AI */}
-          {leftTab === "ai" && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5 shrink-0 bg-[#13131f]">
-                <button onClick={() => setAiMode("fresh")}
-                  className={`flex-1 py-1 text-[10px] font-mono rounded transition-colors ${aiMode === "fresh" ? "bg-violet-500/25 text-violet-200 border border-violet-500/40" : "text-white/40 hover:text-white/60 border border-white/8"}`}>
-                  ✨ Build Fresh
-                </button>
-                <button onClick={() => setAiMode("improve")}
-                  className={`flex-1 py-1 text-[10px] font-mono rounded transition-colors ${aiMode === "improve" ? "bg-blue-500/25 text-blue-200 border border-blue-500/40" : "text-white/40 hover:text-white/60 border border-white/8"}`}>
-                  🔧 Improve
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                {aiMessages.map((msg, i) => (
-                  <div key={i}>
-                    {msg.role === "user" && (
-                      <div className="flex justify-end">
-                        <div className="max-w-[90%] bg-violet-600/30 border border-violet-500/30 rounded-2xl rounded-tr-sm px-3 py-2 text-sm text-violet-100">{msg.text}</div>
-                      </div>
-                    )}
-                    {msg.role === "ai" && (
-                      <div className="flex gap-2">
-                        <div className="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                          <Bot className="w-3 h-3 text-violet-400" />
-                        </div>
-                        <div className="flex-1 bg-white/5 border border-white/8 rounded-2xl rounded-tl-sm px-3 py-2.5 text-sm text-white/85 leading-relaxed">
-                          {msg.text === "__loading__" ? (
-                            <div className="flex items-center gap-2 text-white/50">
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
-                              <span className="text-xs font-mono animate-pulse">Building your website…</span>
-                            </div>
-                          ) : (
-                            <span className="whitespace-pre-wrap">{msg.text}</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {msg.role === "system" && (
-                      <div className="flex gap-2">
-                        <div className="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                          <Sparkles className="w-3 h-3 text-violet-400" />
-                        </div>
-                        <div className="flex-1 text-xs text-white/50 leading-relaxed whitespace-pre-wrap pt-1">{msg.text}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <div ref={chatBottomRef} />
-              </div>
-
-              <div className="p-3 border-t border-white/8 bg-[#13131f] shrink-0">
-                <div className="flex gap-2 items-end">
-                  <textarea
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiSend(); } }}
-                    placeholder={aiMode === "fresh" ? "Describe the website you want…" : "What should I change or add?"}
-                    rows={3}
-                    disabled={aiLoading}
-                    className="flex-1 bg-[#252540] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none focus:border-violet-500/60 disabled:opacity-50 leading-relaxed"
-                  />
-                  <button onClick={handleAiSend} disabled={!aiInput.trim() || aiLoading}
-                    className="w-9 h-9 flex items-center justify-center bg-violet-600 hover:bg-violet-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0 mb-0.5">
-                    {aiLoading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-4 h-4 text-white" />}
+                  <button onClick={(e) => handleDeleteFile(file.id, e)} className="opacity-0 group-hover:opacity-100 text-white/25 hover:text-red-400 transition-all shrink-0 ml-1">
+                    <Trash2 className="w-2.5 h-2.5" />
                   </button>
                 </div>
-                <p className="text-[9px] text-white/20 mt-1.5 font-mono text-center">Enter to send · Shift+Enter for newline</p>
+              );
+            })}
+            {addingFile && (
+              <div className="px-3 py-2 border-t border-white/5">
+                <Input autoFocus value={newFileName} onChange={(e) => setNewFileName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddFile(); if (e.key === "Escape") setAddingFile(false); }}
+                  placeholder="name.html" className="h-6 text-[10px] font-mono bg-white/8 border-white/15 rounded px-2 text-white placeholder:text-white/25" />
+                <div className="flex gap-2 mt-1">
+                  <button onClick={handleAddFile} className="text-[10px] font-mono text-[#0066ff] hover:text-blue-400">Create</button>
+                  <button onClick={() => { setAddingFile(false); setNewFileName(""); }} className="text-[10px] font-mono text-white/25 hover:text-white/50">Cancel</button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* EDITOR */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="h-9 bg-[#252526] border-b border-white/8 flex items-end overflow-x-auto shrink-0">
+        {/* EDITOR + optional PREVIEW */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* File tabs */}
+          <div className="h-9 bg-[#1e1e1e] border-b border-white/6 flex items-end overflow-x-auto shrink-0">
             {pages?.map((file) => {
               const active = file.id === activeFileId;
               return (
                 <button key={file.id} onClick={() => switchFile(file as FileItem)}
-                  className={`flex items-center gap-1.5 px-4 h-full text-xs font-mono transition-colors shrink-0 border-r border-white/5 ${active ? "bg-[#1e1e1e] text-white border-t-2 border-t-primary" : "text-white/40 hover:text-white/70 hover:bg-white/4"}`}>
-                  <span>{getIcon(file.slug)}</span>
+                  className={`flex items-center gap-1.5 px-4 h-full text-[11px] font-mono transition-colors shrink-0 border-r border-white/4 ${active ? "bg-[#0e0e0e] text-white border-t-2 border-t-[#0066ff]" : "text-white/35 hover:text-white/65 hover:bg-white/3"}`}>
+                  <FileIcon slug={file.slug} className="w-3 h-3 opacity-70" />
                   {file.slug}
-                  {active && hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {active && hasUnsaved && <span className="w-1 h-1 rounded-full bg-amber-400" />}
                 </button>
               );
             })}
-            <button onClick={() => { setLeftTab("files"); setAddingFile(true); }}
-              className="flex items-center gap-1 px-3 h-full text-white/30 hover:text-white/60 hover:bg-white/4 text-xs transition-colors shrink-0">
-              <Plus className="w-3.5 h-3.5" />
-            </button>
           </div>
-          {activeFile ? (
-            <Editor height="100%" language={getLang(activeFile.slug)} value={editedContent}
-              onChange={(v) => setEditedContent(v || "")} theme="vs-dark"
-              options={{ minimap: { enabled: false }, fontSize: 13, tabSize: 2, wordWrap: "off", scrollBeyondLastLine: false, automaticLayout: true, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace", fontLigatures: true, cursorBlinking: "smooth", smoothScrolling: true, padding: { top: 14, bottom: 14 }, lineNumbers: "on", bracketPairColorization: { enabled: true } }}
-              onMount={(editor) => { editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: handleSave }); }}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-white/20 flex-col gap-3">
-              <FileCode className="w-10 h-10" />
-              <p className="text-sm font-mono">Select a file to edit</p>
+
+          <div className="flex-1 flex overflow-hidden">
+            {/* Monaco */}
+            <div className={showPreview ? "w-1/2 flex flex-col overflow-hidden border-r border-white/6" : "flex-1 flex flex-col overflow-hidden"}>
+              {activeFile ? (
+                <Editor
+                  height="100%"
+                  language={getLang(activeFile.slug)}
+                  value={editedContent}
+                  onChange={(v) => setEditedContent(v || "")}
+                  theme="vs-dark"
+                  options={{ minimap: { enabled: false }, fontSize: 12, tabSize: 2, wordWrap: "off", scrollBeyondLastLine: false, automaticLayout: true, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace", fontLigatures: true, cursorBlinking: "smooth", smoothScrolling: true, padding: { top: 12, bottom: 12 }, lineNumbers: "on", bracketPairColorization: { enabled: true } }}
+                  onMount={(editor) => { editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: handleSave }); }}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-white/15 flex-col gap-3">
+                  <FileCode className="w-8 h-8" />
+                  <p className="text-xs font-mono">Select a file to edit</p>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Preview panel */}
+            {showPreview && (
+              <div className="w-1/2 flex flex-col overflow-hidden">
+                <div className="h-8 bg-[#1a1a1a] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
+                  <div className="flex gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]/60" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]/60" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/60" />
+                  </div>
+                  <div className="flex-1 mx-2 bg-[#0e0e0e] rounded text-[10px] font-mono text-white/20 px-2 py-0.5 truncate">
+                    {publishedUrl || "preview"}
+                  </div>
+                  <button
+                    onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
+                    className="text-white/20 hover:text-white/50 transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
+                <iframe key={previewKey} srcDoc={previewDoc} sandbox="allow-scripts" className="flex-1 w-full border-none bg-white" title="preview" />
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* PREVIEW */}
-        <div className="w-[40%] flex flex-col border-l border-white/8 shrink-0">
-          <div className="h-8 bg-[#2d2d2d] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/50" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/50" />
+        {/* ── AI PANEL (Replit-style) ── */}
+        <div className="w-80 shrink-0 border-l border-white/6 bg-[#141414] flex flex-col overflow-hidden">
+
+          {/* AI header */}
+          <div className="h-11 flex items-center px-4 border-b border-white/6 shrink-0 gap-2">
+            <div className="w-5 h-5 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0">
+              <Sparkles className="w-3 h-3 text-white" />
             </div>
-            <div className="flex-1 mx-2 bg-[#1e1e1e] rounded text-[10px] font-mono text-white/25 px-2 py-0.5 truncate">
-              {publishedUrl || "preview"}
-            </div>
-            <button onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
-              className="text-white/25 hover:text-white/60 transition-colors" title="Refresh preview">
-              <RefreshCw className="w-3 h-3" />
+            <span className="text-sm font-semibold text-white">AI</span>
+            <span className="text-[10px] font-mono text-white/25 ml-0.5">gpt‑5.6‑terra</span>
+            <div className="flex-1" />
+            <button
+              onClick={() => setAiMessages([{ role: "welcome" }])}
+              className="w-7 h-7 flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/6 rounded transition-colors"
+              title="New conversation"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </div>
-          <iframe key={previewKey} srcDoc={previewDoc} sandbox="allow-scripts" className="flex-1 w-full border-none bg-white" title="preview" />
+
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+            {aiMessages.map((msg, i) => (
+              <AiMessage key={i} msg={msg} onSuggestion={handleAiSend} />
+            ))}
+            <div ref={chatBottomRef} />
+          </div>
+
+          {/* Input area */}
+          <div className="p-3 border-t border-white/6 shrink-0">
+            <div className={`bg-[#1e1e1e] border rounded-xl overflow-hidden transition-colors ${aiLoading ? "border-white/10" : "border-white/12 focus-within:border-[#0066ff]/60"}`}>
+              <textarea
+                ref={textareaRef}
+                value={aiInput}
+                onChange={handleTextareaInput}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiSend(); }
+                }}
+                placeholder="Ask AI to build or change anything…"
+                rows={1}
+                disabled={aiLoading}
+                className="w-full bg-transparent px-3 pt-3 pb-1 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none disabled:opacity-50 leading-relaxed"
+                style={{ minHeight: "40px", maxHeight: "160px" }}
+              />
+              <div className="flex items-center justify-between px-3 pb-2 pt-1">
+                <span className="text-[10px] text-white/20 font-mono">⏎ send · ⇧⏎ newline</span>
+                <button
+                  onClick={() => handleAiSend()}
+                  disabled={!aiInput.trim() || aiLoading}
+                  className="w-7 h-7 flex items-center justify-center bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors"
+                >
+                  {aiLoading
+                    ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                    : <Send className="w-3.5 h-3.5 text-white" />
+                  }
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px] text-white/15 font-mono text-center mt-2">AI may make mistakes. Review before publishing.</p>
+          </div>
         </div>
       </div>
 
-      {/* STATUS BAR */}
-      <div className="h-5 bg-[#007acc] flex items-center px-4 gap-4 text-[10px] text-white/70 shrink-0 font-mono">
+      {/* ── STATUS BAR ── */}
+      <div className="h-5 bg-[#0066ff] flex items-center px-4 gap-4 text-[10px] text-white/70 shrink-0 font-mono">
         <span>{activeFile ? getLang(activeFile.slug).toUpperCase() : ""}</span>
         <span className="flex-1" />
         <span>{pages?.length ?? 0} files</span>
-        {hasUnsaved && <span className="text-amber-200">● Unsaved</span>}
-        <span>Ctrl+S to save</span>
+        {hasUnsaved && <span className="text-white">● Unsaved changes</span>}
+        <span className="hidden sm:inline">Ctrl+S to save</span>
       </div>
 
-      {/* PUBLISH SUCCESS DIALOG */}
+      {/* ── PUBLISH DIALOG ── */}
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
-        <DialogContent className="sm:max-w-md bg-[#1a1a2e] border-violet-500/30 rounded-xl text-white">
+        <DialogContent className="sm:max-w-md bg-[#1a1a1a] border-white/10 rounded-xl text-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-mono">
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               Site is Live!
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-1">
-            <p className="text-sm text-white/60">Your website is publicly accessible at:</p>
-            <div className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg px-3 py-2.5">
-              <Globe className="w-4 h-4 text-violet-400 shrink-0" />
-              <span className="flex-1 text-sm font-mono text-violet-200 truncate">{publishedUrl}</span>
+            <p className="text-sm text-white/50">Your website is publicly accessible at:</p>
+            <div className="flex items-center gap-2 bg-black/30 border border-white/8 rounded-lg px-3 py-2.5">
+              <Globe className="w-4 h-4 text-[#0066ff] shrink-0" />
+              <span className="flex-1 text-sm font-mono text-blue-300 truncate">{publishedUrl}</span>
               <button onClick={() => { if (publishedUrl) { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); } }}
-                className="text-white/40 hover:text-white transition-colors shrink-0">
+                className="text-white/30 hover:text-white transition-colors shrink-0">
                 <Copy className="w-4 h-4" />
               </button>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setPublishOpen(false)} className="flex-1 border-white/10 text-white/70 hover:text-white rounded-lg font-mono text-xs">
+              <Button variant="outline" onClick={() => setPublishOpen(false)} className="flex-1 border-white/10 text-white/60 hover:text-white rounded-lg font-mono text-xs">
                 Close
               </Button>
               <Button onClick={() => window.open(publishedUrl!, "_blank")}
-                className="flex-1 bg-violet-600 hover:bg-violet-500 text-white rounded-lg font-mono text-xs">
+                className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] text-white rounded-lg font-mono text-xs">
                 <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Site
               </Button>
             </div>
-            <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 text-xs text-amber-200/70 leading-relaxed">
-              <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5 text-amber-400" />
-              This URL is hosted by Replit and is always live. To use a custom domain like <span className="font-mono">www.yoursite.com</span>, point your domain's DNS to this URL or use a service like Cloudflare to proxy it.
+            <div className="border border-white/8 bg-white/3 rounded-lg p-3 text-xs text-white/35 leading-relaxed">
+              <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5 text-white/40" />
+              This URL is always live. To use a custom domain, point your DNS or use Cloudflare to proxy it.
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* SETTINGS */}
+      {/* ── SETTINGS ── */}
       {site && <SiteSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} site={site} updateSite={updateSite} queryClient={queryClient} />}
     </div>
   );
+}
+
+// ── AI message renderer ──
+function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string) => void }) {
+  if (msg.role === "welcome") {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0 mt-0.5">
+            <Sparkles className="w-3.5 h-3.5 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm text-white/80 leading-relaxed">
+              Hi! I build complete multi-page websites from a single description — homepage, about, services, plus shared CSS and JS.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5 pl-8">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => onSuggestion(s)}
+              className="text-left text-xs text-white/50 hover:text-white/80 bg-white/4 hover:bg-white/8 border border-white/8 hover:border-white/15 rounded-lg px-3 py-2 transition-all"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.role === "thinking") {
+    return (
+      <div className="flex items-start gap-2.5">
+        <div className="w-6 h-6 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0 mt-0.5">
+          <Sparkles className="w-3.5 h-3.5 text-white" />
+        </div>
+        <div className="flex-1 bg-white/4 border border-white/8 rounded-2xl rounded-tl-sm px-3.5 py-3">
+          <div className="flex items-center gap-2 text-white/40">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0066ff]" />
+            <span className="text-xs font-mono">Building your website…</span>
+          </div>
+          <div className="flex gap-1 mt-2">
+            {["index.html", "about.html", "services.html", "style.css", "script.js"].map((f, i) => (
+              <span key={f} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-white/25 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }}>{f}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] bg-[#0066ff] rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm text-white leading-relaxed">
+          {msg.text}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.role === "assistant") {
+    return (
+      <div className="flex items-start gap-2.5">
+        <div className="w-6 h-6 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0 mt-0.5">
+          <Sparkles className="w-3.5 h-3.5 text-white" />
+        </div>
+        <div className="flex-1 space-y-2">
+          <div className="bg-white/4 border border-white/8 rounded-2xl rounded-tl-sm px-3.5 py-3 text-sm text-white/80 leading-relaxed">
+            {msg.text}
+          </div>
+          {msg.files && msg.files.length > 0 && (
+            <div className="bg-[#0d1f0d] border border-emerald-500/20 rounded-xl px-3 py-2.5 space-y-1.5">
+              <p className="text-[10px] font-mono text-emerald-400/70 uppercase tracking-wider mb-2">Applied changes</p>
+              {msg.files.map((f) => (
+                <div key={f} className="flex items-center gap-2 text-xs font-mono text-white/60">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <FileIcon slug={f} className="w-3 h-3 shrink-0 opacity-50" />
+                  <span>{f}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function SiteSettingsDialog({ open, onClose, site, updateSite, queryClient }: any) {
@@ -602,7 +703,7 @@ function SiteSettingsDialog({ open, onClose, site, updateSite, queryClient }: an
   const { toast } = useToast();
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm bg-[#252526] border-white/10 rounded-none text-white">
+      <DialogContent className="sm:max-w-sm bg-[#1a1a1a] border-white/10 rounded-xl text-white">
         <DialogHeader><DialogTitle className="font-mono text-sm flex items-center gap-2"><Settings className="w-4 h-4" /> Site Settings</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
           {[
@@ -610,20 +711,23 @@ function SiteSettingsDialog({ open, onClose, site, updateSite, queryClient }: an
             { label: "Client Email", value: clientEmail, set: setClientEmail, placeholder: "client@company.com" },
           ].map(({ label, value, set, placeholder }) => (
             <div key={label}>
-              <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5 block">{label}</label>
-              <Input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="bg-[#1e1e1e] border-white/10 rounded-none font-mono text-white h-9 text-sm" />
+              <label className="text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5 block">{label}</label>
+              <Input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="bg-[#0e0e0e] border-white/10 rounded-lg font-mono text-white h-9 text-sm" />
             </div>
           ))}
           <div>
-            <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5 block">Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 text-white text-sm h-9 px-3 font-mono rounded-none focus:outline-none">
+            <label className="text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5 block">Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-[#0e0e0e] border border-white/10 text-white text-sm h-9 px-3 font-mono rounded-lg focus:outline-none">
               {["draft", "building", "review", "paused", "live"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
           </div>
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={onClose} className="flex-1 border-white/10 text-white rounded-none font-mono text-xs">Cancel</Button>
-            <Button onClick={() => updateSite.mutate({ id: site.id, data: { domain, clientEmail, status } }, { onSuccess: () => { toast({ title: "Saved" }); queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(site.id) }); onClose(); } })}
-              disabled={updateSite.isPending} className="flex-1 bg-primary text-[#0a0a10] hover:bg-primary/90 rounded-none font-mono text-xs font-bold">
+            <Button variant="outline" onClick={onClose} className="flex-1 border-white/10 text-white rounded-lg font-mono text-xs">Cancel</Button>
+            <Button
+              onClick={() => updateSite.mutate({ id: site.id, data: { domain, clientEmail, status } }, { onSuccess: () => { toast({ title: "Saved" }); queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(site.id) }); onClose(); } })}
+              disabled={updateSite.isPending}
+              className="flex-1 bg-[#0066ff] hover:bg-[#0052cc] text-white rounded-lg font-mono text-xs font-bold"
+            >
               {updateSite.isPending ? "Saving…" : "Save"}
             </Button>
           </div>

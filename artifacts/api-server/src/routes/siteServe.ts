@@ -1,13 +1,17 @@
 /**
  * Public site serving — no auth required.
- * GET /s/:siteSlug/            → serves index.html  (slug or numeric id both work)
- * GET /s/:siteSlug/:filename   → serves any page by filename
+ * GET /s/:siteRef            → serves index.html
+ * GET /s/:siteRef/           → serves index.html
+ * GET /s/:siteRef/:filename  → serves named file
+ *
+ * siteRef can be a numeric id OR a slugified projectName.
  */
 import { Router, type IRouter } from "express";
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, sitesTable, sitePagesTable } from "@workspace/db";
 
-const router: IRouter = Router();
+// Use strict routing so trailing-slash and no-trailing-slash are separate routes
+const router: IRouter = Router({ strict: true });
 
 const MIME: Record<string, string> = {
   html: "text/html; charset=utf-8",
@@ -34,40 +38,20 @@ async function resolveSite(siteRef: string) {
     const [s] = await db.select().from(sitesTable).where(eq(sitesTable.id, numericId));
     return s ?? null;
   }
-  // slug lookup — match against slugified projectName
   const all = await db.select().from(sitesTable);
   return all.find((s) => toSiteSlug(s.projectName) === siteRef) ?? null;
 }
-
-// GET /s/:siteRef/:filename
-router.get("/s/:siteRef/:filename", async (req: any, res: any): Promise<void> => {
-  await serveFile(req, res, req.params.filename);
-});
-
-// GET /s/:siteRef  → redirect to trailing slash so relative links resolve correctly
-router.get("/s/:siteRef", async (req: any, res: any): Promise<void> => {
-  res.redirect(301, `/api/s/${req.params.siteRef}/`);
-});
-
-// GET /s/:siteRef/
-router.get("/s/:siteRef/", async (req: any, res: any): Promise<void> => {
-  await serveFile(req, res, "index.html");
-});
 
 async function serveFile(req: any, res: any, filename: string) {
   try {
     const site = await resolveSite(req.params.siteRef);
     if (!site) { res.status(404).send("<h1>Site not found</h1>"); return; }
 
-    const pages = await db
-      .select()
-      .from(sitePagesTable)
-      .where(eq(sitePagesTable.siteId, site.id));
-
+    const pages = await db.select().from(sitePagesTable).where(eq(sitePagesTable.siteId, site.id));
     if (pages.length === 0) { res.status(404).send("<h1>No pages published yet</h1>"); return; }
 
     const page = pages.find((p) => p.slug === filename) ?? (filename === "index.html" ? pages[0] : null);
-    if (!page) { res.status(404).send(`<h1>File not found: ${filename}</h1>`); return; }
+    if (!page) { res.status(404).send(`<h1>Not found: ${filename}</h1>`); return; }
 
     res.setHeader("Content-Type", mime(page.slug));
     res.setHeader("Cache-Control", "public, max-age=60");
@@ -77,5 +61,20 @@ async function serveFile(req: any, res: any, filename: string) {
     res.status(500).send("<h1>Server error</h1>");
   }
 }
+
+// Named file (e.g. style.css, about.html)
+router.get("/s/:siteRef/:filename", async (req: any, res: any) => {
+  await serveFile(req, res, req.params.filename);
+});
+
+// Root with trailing slash — serve index.html directly (no redirect)
+router.get("/s/:siteRef/", async (req: any, res: any) => {
+  await serveFile(req, res, "index.html");
+});
+
+// Root without trailing slash — add the slash so relative asset links work
+router.get("/s/:siteRef", async (req: any, res: any) => {
+  res.redirect(302, `${req.path}/`);
+});
 
 export default router;
