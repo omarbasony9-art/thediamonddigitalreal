@@ -247,7 +247,7 @@ export default function ClientPortal() {
           <div className="mt-12 pt-8 border-t border-white/8 text-center">
             <p className="text-muted-foreground text-sm mb-4">Have questions about your project?</p>
             <Button asChild variant="outline" className="border-white/20 rounded-none font-mono text-sm gap-2">
-              <a href="mailto:hello@diamonddigital.dev">CONTACT YOUR TEAM</a>
+              <a href="mailto:contact@thetitanmedia.com">CONTACT YOUR TEAM</a>
             </Button>
           </div>
         </motion.div>
