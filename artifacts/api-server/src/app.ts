@@ -22,6 +22,17 @@ const MIME_MAP: Record<string, string> = {
   txt:  "text/plain; charset=utf-8",
 };
 
+// Build the set of platform-owned domains at startup so we never intercept them.
+// REPLIT_DOMAINS can be comma-separated; include all variants.
+const PLATFORM_DOMAINS = new Set<string>(
+  [
+    ...(process.env.REPLIT_DOMAINS || "").split(","),
+    ...(process.env.REPLIT_DEV_DOMAIN || "").split(","),
+  ]
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean)
+);
+
 /** Serve client sites on their custom domains (before any /api routing). */
 async function customDomainMiddleware(req: any, res: any, next: any) {
   try {
@@ -31,14 +42,15 @@ async function customDomainMiddleware(req: any, res: any, next: any) {
       "";
     const host = rawHost.split(":")[0].toLowerCase();
 
-    // Skip the platform's own domains — only intercept genuine custom domains
+    // Skip the platform's own domains — only intercept genuine client domains
     if (
       !host ||
       host === "localhost" ||
       /^\d+\.\d+\.\d+\.\d+$/.test(host) ||
       host.endsWith(".replit.dev") ||
       host.endsWith(".replit.app") ||
-      host.endsWith(".worf.replit.dev")
+      host.endsWith(".worf.replit.dev") ||
+      PLATFORM_DOMAINS.has(host)
     ) {
       return next();
     }
