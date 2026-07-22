@@ -25,23 +25,31 @@ CREATIVE RULES (non-negotiable):
 - Make the hero section dramatic: full-screen, with a strong visual statement, a punchy headline, and a clear CTA.
 - Every section should have a clear purpose and a distinct visual treatment — no two sections should look the same.
 
+PAGE COUNT RULES:
+- Decide how many pages make sense for the business. Use between 3 and 8 HTML pages.
+- Simple businesses (café, barber, freelancer): 3–4 pages.
+- Medium businesses (agency, gym, restaurant, clinic): 4–6 pages.
+- Complex businesses (SaaS, real estate, law firm, ecommerce): 6–8 pages.
+- Always include index.html. Choose additional pages from: about.html, services.html, portfolio.html, pricing.html, blog.html, contact.html, team.html, faq.html, gallery.html — whatever makes sense.
+- Always end with exactly one style.css and one script.js.
+
 OUTPUT FORMAT — output ONLY this delimiter format, nothing else, no markdown fences:
 
 <<<FILE:index.html>>>
-(homepage — hero, features/benefits, testimonial or social proof, CTA)
-<<<FILE:about.html>>>
-(about page — story, team/founder, mission/values, timeline or credentials)
-<<<FILE:services.html>>>
-(services or portfolio page — what they offer, pricing hint, process, CTA)
+(homepage)
+<<<FILE:[page2].html>>>
+(second page)
+<<<FILE:[page3].html>>>
+(third page — add more <<<FILE:name.html>>> blocks as needed, up to 8 HTML files)
 <<<FILE:style.css>>>
-(all shared CSS — custom properties, resets, typography, layout, animations)
+(all shared CSS)
 <<<FILE:script.js>>>
-(shared JS — mobile nav, scroll animations, IntersectionObserver, parallax, counters)
+(shared JS)
 <<<END>>>
 
 TECHNICAL REQUIREMENTS:
 - Every HTML file: <link rel="stylesheet" href="style.css"> in <head>, <script src="script.js"></script> before </body>
-- Navigation in every HTML page links to all 3 pages with relative hrefs
+- Navigation in every HTML page must link to ALL generated pages with correct relative hrefs
 - CSS: use CSS custom properties (--color-*, --font-*) at :root, clamp() for fluid sizing, @keyframes for animations
 - JS: mobile nav toggle, IntersectionObserver fade-in-up for all sections, smooth scroll, active nav link based on current page filename
 - Google Fonts: pick two complementary fonts and load them via @import in the CSS
