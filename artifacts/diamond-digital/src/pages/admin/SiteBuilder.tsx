@@ -1305,7 +1305,7 @@ export default function SiteBuilder() {
                       {publishedUrl && (
                         <div className="flex items-center gap-2 bg-black/30 border border-white/8 rounded-md px-2.5 py-1.5 mt-2">
                           <Globe className="w-3 h-3 text-[#0066ff] shrink-0" />
-                          <span className="flex-1 text-[11px] font-mono text-blue-300 truncate">{publishedUrl}</span>
+                          <span className="flex-1 text-sm font-mono text-blue-300 truncate">{publishedUrl}</span>
                           <button onClick={() => { navigator.clipboard.writeText(publishedUrl!); toast({ title: "Copied!" }); }}
                             className="text-white/30 hover:text-white shrink-0 transition-colors">
                             <Copy className="w-3 h-3" />
