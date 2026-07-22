@@ -15,7 +15,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Play, RefreshCw, Settings, Plus, Trash2, FileCode,
-  Globe, CheckCircle2, ExternalLink, Copy, AlertTriangle, X, ChevronRight
+  Globe, CheckCircle2, ExternalLink, Copy, AlertTriangle, X, ChevronRight,
+  Sparkles, Send, Bot, Loader2, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type FileItem = { id: number; title: string; slug: string; content: string; order: number };
+type AiMessage = { role: "user" | "assistant" | "system"; content: string };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const getLang = (slug: string) => {
@@ -224,6 +226,16 @@ export default function SiteBuilder() {
   const [addingFile, setAddingFile] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
+  // AI state
+  const [rightPanel, setRightPanel] = useState<"preview" | "ai">("preview");
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([
+    { role: "system", content: "👋 Hi! Describe the website you want and I'll build it for you. Be as detailed as you like — industry, colors, sections, style, anything." },
+  ]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiMode, setAiMode] = useState<"fresh" | "improve">("fresh");
+  const aiChatRef = useRef<HTMLDivElement>(null);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -267,13 +279,10 @@ export default function SiteBuilder() {
   }, [pages, activeFileId]);
 
   // Sync edited content when switching files
-  const switchFile = useCallback(
-    (file: FileItem) => {
-      setActiveFileId(file.id);
-      setEditedContent(file.content);
-    },
-    []
-  );
+  const switchFile = useCallback((file: FileItem) => {
+    setActiveFileId(file.id);
+    setEditedContent(file.content);
+  }, []);
 
   // Auto-preview with debounce
   useEffect(() => {
@@ -294,6 +303,13 @@ export default function SiteBuilder() {
       setPreviewDoc(buildPreview(pages as FileItem[]));
     }
   }, [pages]);
+
+  // Scroll AI chat to bottom on new messages
+  useEffect(() => {
+    if (aiChatRef.current) {
+      aiChatRef.current.scrollTop = aiChatRef.current.scrollHeight;
+    }
+  }, [aiMessages]);
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
 
@@ -378,6 +394,158 @@ export default function SiteBuilder() {
     toast({ title: "Copied" });
   };
 
+  // ── AI GENERATION ──────────────────────────────────────────────────────
+  const handleAiGenerate = async () => {
+    if (!aiInput.trim() || aiGenerating) return;
+    const prompt = aiInput.trim();
+    setAiInput("");
+    setAiMessages((prev) => [...prev, { role: "user", content: prompt }]);
+    setAiGenerating(true);
+
+    // Collect current files for "improve" mode
+    const existingFiles =
+      aiMode === "improve" && pages
+        ? pages.map((p) => ({
+            name: p.slug,
+            content: p.id === activeFileId ? editedContent : p.content,
+          }))
+        : [];
+
+    try {
+      const token = localStorage.getItem("admin_token");
+      const response = await fetch(`${import.meta.env.BASE_URL}api/admin/ai/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ description: prompt, existingFiles }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("Request failed");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let thinkingMsg = "⏳ Generating your website…";
+      setAiMessages((prev) => [...prev, { role: "assistant", content: thinkingMsg }]);
+
+      let dotCount = 0;
+      const dotInterval = setInterval(() => {
+        dotCount = (dotCount + 1) % 4;
+        const dots = ".".repeat(dotCount + 1);
+        setAiMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: "assistant", content: `⏳ Writing code${dots}` };
+          return copy;
+        });
+      }, 500);
+
+      let done = false;
+      while (!done) {
+        const { done: streamDone, value } = await reader.read();
+        if (streamDone) break;
+        const text = decoder.decode(value);
+        const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "done") {
+              clearInterval(dotInterval);
+              done = true;
+              await applyGeneratedFiles(data.files);
+            } else if (data.type === "error") {
+              clearInterval(dotInterval);
+              done = true;
+              setAiMessages((prev) => {
+                const copy = [...prev];
+                copy[copy.length - 1] = { role: "assistant", content: `❌ ${data.message}` };
+                return copy;
+              });
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (err: any) {
+      setAiMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { role: "assistant", content: `❌ Generation failed: ${err.message}` };
+        return copy;
+      });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const applyGeneratedFiles = async (files: { html: string; css: string; js: string }) => {
+    const currentPages = pages || [];
+    const fileMap: Record<string, string> = {
+      "index.html": files.html,
+      "style.css": files.css,
+      "script.js": files.js,
+    };
+
+    const updates: Promise<void>[] = [];
+
+    for (const [slug, content] of Object.entries(fileMap)) {
+      const existing = currentPages.find((p) => p.slug === slug);
+      if (existing) {
+        updates.push(
+          new Promise<void>((resolve) => {
+            updatePage.mutate(
+              { id, pageId: existing.id, data: { content, title: existing.title } },
+              { onSuccess: () => resolve(), onError: () => resolve() }
+            );
+          })
+        );
+      } else {
+        updates.push(
+          new Promise<void>((resolve) => {
+            createPage.mutate(
+              { id, data: { title: slug, slug, content } },
+              { onSuccess: () => resolve(), onError: () => resolve() }
+            );
+          })
+        );
+      }
+    }
+
+    await Promise.all(updates);
+    await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+
+    // Switch to index.html in editor
+    const htmlPage = currentPages.find((p) => p.slug === "index.html");
+    if (htmlPage) {
+      setActiveFileId(htmlPage.id);
+      setEditedContent(files.html);
+    }
+
+    // Build preview with new content
+    const merged = currentPages.map((p) => {
+      if (p.slug === "index.html") return { ...p, content: files.html };
+      if (p.slug === "style.css") return { ...p, content: files.css };
+      if (p.slug === "script.js") return { ...p, content: files.js };
+      return p;
+    });
+    setPreviewDoc(buildPreview(merged as FileItem[]));
+    setPreviewKey((k) => k + 1);
+
+    // Switch to preview so they see the result
+    setRightPanel("preview");
+
+    setAiMessages((prev) => {
+      const copy = [...prev];
+      copy[copy.length - 1] = {
+        role: "assistant",
+        content: "✅ Done! Your website has been built and loaded into the editor. Click **Preview** to see it, or keep chatting to refine it further.",
+      };
+      return copy;
+    });
+
+    toast({ title: "✨ Website generated!", description: "Check the preview panel." });
+  };
+
   const hasUnsavedChanges = activeFile && editedContent !== activeFile.content;
 
   return (
@@ -392,7 +560,6 @@ export default function SiteBuilder() {
         </Link>
         <div className="w-px h-5 bg-white/10" />
 
-        {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm">
           <span className="text-white/40 font-mono">{site?.clientName}</span>
           <ChevronRight className="w-3.5 h-3.5 text-white/20" />
@@ -411,7 +578,19 @@ export default function SiteBuilder() {
 
         <div className="flex-1" />
 
-        {/* Actions */}
+        {/* AI Button */}
+        <button
+          onClick={() => setRightPanel(rightPanel === "ai" ? "preview" : "ai")}
+          className={`flex items-center gap-1.5 px-3 h-7 text-xs font-mono rounded transition-all ${
+            rightPanel === "ai"
+              ? "bg-violet-500/30 text-violet-300 border border-violet-500/40"
+              : "bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border border-violet-500/20"
+          }`}
+        >
+          <Sparkles className="w-3 h-3" />
+          AI Builder
+        </button>
+
         <button
           onClick={() => setSettingsOpen(true)}
           className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/8 rounded transition-colors"
@@ -574,29 +753,137 @@ export default function SiteBuilder() {
           )}
         </div>
 
-        {/* Live Preview */}
-        <div className="w-[42%] bg-white flex flex-col border-l border-white/8 shrink-0">
-          <div className="h-8 bg-[#2d2d2d] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
-            </div>
-            <div className="flex-1 mx-3 bg-[#1e1e1e] rounded text-[10px] font-mono text-white/30 px-2 py-0.5 truncate">
-              {site?.domain ? `https://${site.domain}` : "preview"}
-            </div>
-            <button onClick={handleRun} className="text-white/30 hover:text-white/60 transition-colors" title="Refresh preview">
-              <RefreshCw className="w-3 h-3" />
+        {/* Right Panel: Preview OR AI Chat */}
+        <div className="w-[42%] flex flex-col border-l border-white/8 shrink-0 overflow-hidden">
+
+          {/* Panel Switcher */}
+          <div className="h-8 bg-[#2d2d2d] flex items-center shrink-0 border-b border-white/5">
+            <button
+              onClick={() => setRightPanel("preview")}
+              className={`flex items-center gap-1.5 px-4 h-full text-[11px] font-mono transition-colors border-r border-white/5 ${
+                rightPanel === "preview" ? "text-white bg-[#1e1e1e]" : "text-white/40 hover:text-white/70"
+              }`}
+            >
+              <Eye className="w-3 h-3" /> Preview
             </button>
+            <button
+              onClick={() => setRightPanel("ai")}
+              className={`flex items-center gap-1.5 px-4 h-full text-[11px] font-mono transition-colors ${
+                rightPanel === "ai" ? "text-violet-300 bg-[#1e1e1e]" : "text-white/40 hover:text-violet-300/70"
+              }`}
+            >
+              <Sparkles className="w-3 h-3" /> AI Builder
+            </button>
+            <div className="flex-1" />
+            {rightPanel === "preview" && (
+              <button onClick={handleRun} className="px-3 text-white/30 hover:text-white/60 transition-colors" title="Refresh">
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            )}
           </div>
-          <iframe
-            ref={iframeRef}
-            key={previewKey}
-            srcDoc={previewDoc}
-            sandbox="allow-scripts"
-            className="flex-1 w-full border-none bg-white"
-            title="Site preview"
-          />
+
+          {/* Preview iframe */}
+          {rightPanel === "preview" && (
+            <iframe
+              ref={iframeRef}
+              key={previewKey}
+              srcDoc={previewDoc}
+              sandbox="allow-scripts"
+              className="flex-1 w-full border-none bg-white"
+              title="Site preview"
+            />
+          )}
+
+          {/* AI Chat Panel */}
+          {rightPanel === "ai" && (
+            <div className="flex-1 flex flex-col bg-[#1a1a2e] overflow-hidden">
+              {/* Mode toggle */}
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest mr-1">Mode:</span>
+                <button
+                  onClick={() => setAiMode("fresh")}
+                  className={`px-3 py-1 text-[11px] font-mono rounded transition-colors ${
+                    aiMode === "fresh" ? "bg-violet-500/30 text-violet-300 border border-violet-500/40" : "text-white/40 hover:text-white/70 border border-white/10"
+                  }`}
+                >
+                  ✨ Build Fresh
+                </button>
+                <button
+                  onClick={() => setAiMode("improve")}
+                  className={`px-3 py-1 text-[11px] font-mono rounded transition-colors ${
+                    aiMode === "improve" ? "bg-blue-500/30 text-blue-300 border border-blue-500/40" : "text-white/40 hover:text-white/70 border border-white/10"
+                  }`}
+                >
+                  🔧 Improve Current
+                </button>
+              </div>
+
+              {/* Chat history */}
+              <div ref={aiChatRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                {aiMessages.map((msg, i) => (
+                  <div key={i} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                    {msg.role !== "user" && (
+                      <div className="w-7 h-7 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot className="w-3.5 h-3.5 text-violet-400" />
+                      </div>
+                    )}
+                    <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-violet-500/20 text-violet-100 border border-violet-500/20"
+                        : msg.role === "system"
+                        ? "bg-white/4 text-white/60 text-xs border border-white/5"
+                        : "bg-[#252540] text-white/90 border border-white/8"
+                    }`}>
+                      {msg.content.split("**").map((part, j) =>
+                        j % 2 === 1 ? <strong key={j}>{part}</strong> : <span key={j}>{part}</span>
+                      )}
+                      {msg.role === "assistant" && aiGenerating && i === aiMessages.length - 1 && (
+                        <span className="inline-flex items-center gap-1 ml-2">
+                          <span className="w-1 h-1 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-1 h-1 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="w-1 h-1 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input */}
+              <div className="px-4 py-3 border-t border-white/8 bg-[#161622]">
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAiGenerate();
+                      }
+                    }}
+                    placeholder={aiMode === "fresh"
+                      ? "Describe your website… e.g. 'A dark barbershop site with booking, gallery, and neon accents'"
+                      : "Describe what to improve… e.g. 'Add a contact form' or 'Make the colors more vibrant'"
+                    }
+                    rows={3}
+                    disabled={aiGenerating}
+                    className="flex-1 bg-[#252540] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-violet-500/50 disabled:opacity-50 font-sans leading-relaxed"
+                  />
+                  <button
+                    onClick={handleAiGenerate}
+                    disabled={!aiInput.trim() || aiGenerating}
+                    className="w-9 h-9 flex items-center justify-center bg-violet-500 hover:bg-violet-400 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors shrink-0"
+                  >
+                    {aiGenerating
+                      ? <Loader2 className="w-4 h-4 text-white animate-spin" />
+                      : <Send className="w-4 h-4 text-white" />
+                    }
+                  </button>
+                </div>
+                <p className="text-[10px] text-white/20 mt-1.5 font-mono">Enter to send · Shift+Enter for new line</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
