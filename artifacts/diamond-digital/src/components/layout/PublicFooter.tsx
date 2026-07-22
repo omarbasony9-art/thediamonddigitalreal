@@ -9,7 +9,7 @@ export function PublicFooter() {
             <Link href="/" className="flex items-center gap-2.5 mb-5">
               <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Diamond Digital Logo" className="w-7 h-7 opacity-80" />
               <span className="font-display font-bold text-lg tracking-wider text-white">
-                SOFTWARE<span className="text-primary">DIAMOND</span>
+                DIAMOND<span className="text-primary">DIGITAL</span>
               </span>
             </Link>
             <p className="text-muted-foreground text-sm max-w-sm leading-relaxed">
