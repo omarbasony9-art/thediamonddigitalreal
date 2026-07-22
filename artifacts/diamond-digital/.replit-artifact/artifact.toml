@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "DiamondDigital"
+version = "1.0.0"
+id = "artifacts/diamond-digital"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24068
+
+[services.development]
+run = "pnpm --filter @workspace/diamond-digital run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/diamond-digital", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/diamond-digital/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24068"
+BASE_PATH = "/"

@@ -1,0 +1,103 @@
+Build Software That Works. Ship Faster. Scale Smarter.
+SoftwareOrbits is a custom software development company that acts as your end-to-end technology partner from idea to deployment. We engineer mobile apps, web platforms, and custom software that put your business ahead of the curve.
+
+Get a Free Consultation
+Award Winning Software Development Services, Built for the Real World.
+From mobile apps to enterprise platforms, our engineering teams deliver solutions that are fast, scalable, and built to last.
+Mobile App Development Icon
+Mobile App Development
+ 
+
+Native and cross-platform apps for iOS and Android — designed for performance, built for growth.
+
+UX/UI Design Icon
+Web Development
+ 
+
+Custom websites and web platforms that look great, load fast, and convert visitors into customers.
+
+Custom Software Icon
+Custom Software
+ 
+
+Bespoke software solutions crafted around your exact workflows, systems, and business goals.
+
+Automation Solutions Icon
+Automation Solutions
+ 
+
+Eliminate bottlenecks with intelligent automation that saves time, reduces costs, and scales with you.
+
+Backend Development Icon
+Backend Development
+ 
+
+Robust, secure APIs and backend systems built with Java, Python, Node.js, PHP, and .NET.
+
+DevOps and Infrastructure Icon
+DevOps and Infrastructure
+ 
+
+Faster deployments, fewer failures, and smoother operations — with CI/CD pipelines built to your specs.
+
+Frontend Development Icon
+Frontend Development
+ 
+
+Pixel-perfect, responsive interfaces with React.js, Vue.js, Angular, and TypeScript.
+
+UX/UI Design Icon
+UX/UI Design
+ 
+
+User experiences that are intuitive, beautiful, and built around real user behavior — not guesswork.
+
+View All Services
+We Build and Transform Products Using AI-Powered Technologies.
+Fuel Your Digital-First Idea
+With 20+ Transformation Experts
+Innovate With Us
+Artificial Intelligence
+We leverage AI to craft intelligent solutions that streamline operations and enhance decision-making capabilities.
+Generative AI
+We utilize Generative AI technology to create solutions that produce new content, automate creative processes and enhance user experiences.
+Machine Learning
+We use ML to build intelligent systems that analyze data patterns and predict outcomes while continuously improving operations.
+AI Agent Integration
+We integrate intelligent AI agents into your product that can automate tasks, respond to users, analyze data, and make decisions in real time without human intervention.
+Cloud Infrastructure
+We offer scalable and secure cloud consulting services that enhance flexibility and reduce IT overhead, allowing your team to focus on business growth.
+Data Science and Analytics
+We leverage data to extract actionable insights, helping your business make informed decisions and optimize operations.
+IoT
+We create IoT apps that connect various devices seamlessly, boosting efficiency and opening new possibilities for enhanced automation and monitoring.
+Progressive Web Apps
+We build progressive web apps that give your users a native app experience directly from their browser. Fast loading, offline capable, and installable on any device without going through an app store. One codebase, maximum reach.
+Payment Gateway Integration
+We integrate secure and reliable payment solutions into your product so your users can transact with confidence. From one time checkouts to recurring subscriptions and marketplace payouts, we connect you to the right payment infrastructure for your business model.
+CI/CD and DevOps Automation
+We build automated pipelines that test, validate, and deploy your code continuously so your team can ship updates faster without breaking things in production. Less downtime, fewer errors, and a development process that actually keeps up with your business.
+Industries We Serve
+Every industry has its own rules, user expectations, and competitive pressures. That is why we never take a one-size-fits-all approach. When we build for your industry, we bring genuine domain knowledge, proven experience, and solutions that are designed to create real business impact.
+Fintech
+We build secure, high-performance financial products — from trading platforms and payment gateways to banking dashboards and investment tools.
+
+Payment Gateway Integration
+Trading & Investment Platforms
+Financial Analytics Dashboards
+
+Healthcare
+We build HIPAA-compliant healthcare applications that streamline patient care, automate clinical workflows, and connect providers with patients seamlessly.
+
+Telemedicine and Virtual Consultations
+Patient Management Systems
+Health Tracking and Monitoring
+
+E-Commerce & Retail
+We create fast, conversion-optimized e-commerce platforms that make buying seamless and selling smarter — from storefront to checkout.
+
+Custom Storefront Development
+Inventory & Order Management
+Personalization & Recommendation Engines
+
+View All Industries

@@ -1,0 +1,150 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syncopate:wght@400;700&display=swap');
+@layer theme, base, clerk, components, utilities;
+@import 'tailwindcss';
+@import '@clerk/themes/shadcn.css';
+@import 'tw-animate-css';
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Syncopate', 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+}
+
+:root {
+  /* Enforce dark mode as the only mode for DiamondDigital */
+  --background: 240 20% 4%; /* Deep space black #08080C */
+  --foreground: 0 0% 100%; /* Diamond white */
+  
+  --card: 240 20% 6%;
+  --card-foreground: 0 0% 100%;
+  --card-border: 190 90% 20%;
+  
+  --popover: 240 20% 6%;
+  --popover-foreground: 0 0% 100%;
+  --popover-border: 190 90% 20%;
+  
+  /* Electric cyan */
+  --primary: 190 100% 50%; 
+  --primary-foreground: 240 20% 4%;
+  
+  /* Deep blue secondary */
+  --secondary: 220 80% 20%;
+  --secondary-foreground: 190 100% 80%;
+  
+  --muted: 240 20% 12%;
+  --muted-foreground: 240 10% 60%;
+  
+  --accent: 190 100% 15%;
+  --accent-foreground: 190 100% 50%;
+  
+  --destructive: 0 80% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 240 20% 15%;
+  --input: 240 20% 12%;
+  --ring: 190 100% 50%;
+  
+  --sidebar: 240 20% 6%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 240 20% 12%;
+  --sidebar-primary: 190 100% 50%;
+  --sidebar-primary-foreground: 240 20% 4%;
+  --sidebar-accent: 190 100% 15%;
+  --sidebar-accent-foreground: 190 100% 50%;
+  --sidebar-ring: 190 100% 50%;
+
+  --radius: 0px; /* Sharp corners like a diamond */
+}
+
+/* Base resets & utilities */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* Force dark color scheme for native elements */
+    color-scheme: dark; 
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  
+  .bg-grid {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  }
+  
+  .glow-text {
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.3), 0 0 20px rgba(0, 255, 255, 0.2);
+  }
+
+  .glass-panel {
+    background: rgba(10, 10, 15, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 255, 255, 0.1);
+  }
+}

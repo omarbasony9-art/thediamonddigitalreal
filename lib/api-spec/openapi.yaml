@@ -3,20 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: DiamondDigital web builder platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: quotes
+    description: Client quote requests
+  - name: sites
+    description: Client website management (admin only)
+  - name: admin
+    description: Admin dashboard and stats
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +30,579 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /quotes:
+    get:
+      operationId: listQuotes
+      tags: [quotes]
+      summary: List all quote requests (admin only)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, reviewed, in_progress, completed, declined]
+      responses:
+        "200":
+          description: List of quote requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+    post:
+      operationId: createQuote
+      tags: [quotes]
+      summary: Submit a quote request (public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteInput"
+      responses:
+        "201":
+          description: Quote request submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        "400":
+          description: Validation error
+
+  /quotes/{id}:
+    get:
+      operationId: getQuote
+      tags: [quotes]
+      summary: Get a quote by ID (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quote details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateQuote
+      tags: [quotes]
+      summary: Update a quote status (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteUpdate"
+      responses:
+        "200":
+          description: Updated quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteQuote
+      tags: [quotes]
+      summary: Delete a quote (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sites:
+    get:
+      operationId: listSites
+      tags: [sites]
+      summary: List all client sites (admin only)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, building, review, live, paused]
+      responses:
+        "200":
+          description: List of client sites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Site"
+    post:
+      operationId: createSite
+      tags: [sites]
+      summary: Create a new client site (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteInput"
+      responses:
+        "201":
+          description: Site created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+
+  /sites/{id}:
+    get:
+      operationId: getSite
+      tags: [sites]
+      summary: Get a client site by ID (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Site details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSite
+      tags: [sites]
+      summary: Update a client site (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteUpdate"
+      responses:
+        "200":
+          description: Updated site
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSite
+      tags: [sites]
+      summary: Delete a client site (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sites/{id}/launch:
+    post:
+      operationId: launchSite
+      tags: [sites]
+      summary: Launch a client site (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Site launched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+        "404":
+          description: Not found
+
+  /sites/{id}/pages:
+    get:
+      operationId: listSitePages
+      tags: [sites]
+      summary: List pages for a site (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of pages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SitePage"
+    post:
+      operationId: createSitePage
+      tags: [sites]
+      summary: Add a page to a site (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SitePageInput"
+      responses:
+        "201":
+          description: Page created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SitePage"
+
+  /sites/{id}/pages/{pageId}:
+    patch:
+      operationId: updateSitePage
+      tags: [sites]
+      summary: Update a site page (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: pageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SitePageUpdate"
+      responses:
+        "200":
+          description: Updated page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SitePage"
+    delete:
+      operationId: deleteSitePage
+      tags: [sites]
+      summary: Delete a page from a site (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: pageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get admin dashboard statistics (admin only)
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [admin]
+      summary: Get recent activity feed (admin only)
+      responses:
+        "200":
+          description: Recent activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    Quote:
+      type: object
+      required: [id, name, email, projectType, description, status, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        projectType:
+          type: string
+          enum: [landing_page, business_site, ecommerce, portfolio, web_app, other]
+        description:
+          type: string
+        budget:
+          type: ["string", "null"]
+        timeline:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, reviewed, in_progress, completed, declined]
+        adminNotes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    QuoteInput:
+      type: object
+      required: [name, email, projectType, description]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+        phone:
+          type: string
+        company:
+          type: string
+        projectType:
+          type: string
+          enum: [landing_page, business_site, ecommerce, portfolio, web_app, other]
+        description:
+          type: string
+          minLength: 10
+        budget:
+          type: string
+        timeline:
+          type: string
+
+    QuoteUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, reviewed, in_progress, completed, declined]
+        adminNotes:
+          type: string
+
+    Site:
+      type: object
+      required: [id, clientName, projectName, domain, status, tech, createdAt]
+      properties:
+        id:
+          type: integer
+        clientName:
+          type: string
+        projectName:
+          type: string
+        domain:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, building, review, live, paused]
+        tech:
+          type: string
+          enum: [react, nextjs, vanilla, wordpress, other]
+        description:
+          type: ["string", "null"]
+        liveUrl:
+          type: ["string", "null"]
+        previewUrl:
+          type: ["string", "null"]
+        quoteId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        launchedAt:
+          type: ["string", "null"]
+
+    SiteInput:
+      type: object
+      required: [clientName, projectName, tech]
+      properties:
+        clientName:
+          type: string
+          minLength: 1
+        projectName:
+          type: string
+          minLength: 1
+        domain:
+          type: string
+        tech:
+          type: string
+          enum: [react, nextjs, vanilla, wordpress, other]
+        description:
+          type: string
+        clientEmail:
+          type: string
+        quoteId:
+          type: integer
+
+    SiteUpdate:
+      type: object
+      properties:
+        clientName:
+          type: string
+        projectName:
+          type: string
+        domain:
+          type: string
+        clientEmail:
+          type: string
+        status:
+          type: string
+          enum: [draft, building, review, live, paused]
+        tech:
+          type: string
+          enum: [react, nextjs, vanilla, wordpress, other]
+        description:
+          type: string
+        liveUrl:
+          type: string
+        previewUrl:
+          type: string
+
+    SitePage:
+      type: object
+      required: [id, siteId, title, slug, content, order, createdAt]
+      properties:
+        id:
+          type: integer
+        siteId:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        content:
+          type: string
+        order:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    SitePageInput:
+      type: object
+      required: [title, slug]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        content:
+          type: string
+        order:
+          type: integer
+
+    SitePageUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        content:
+          type: string
+        order:
+          type: integer
+
+    AdminStats:
+      type: object
+      required: [totalSites, liveSites, buildingSites, pendingQuotes, totalQuotes, recentSites]
+      properties:
+        totalSites:
+          type: integer
+        liveSites:
+          type: integer
+        buildingSites:
+          type: integer
+        pendingQuotes:
+          type: integer
+        totalQuotes:
+          type: integer
+        recentSites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Site"
+
+    ActivityItem:
+      type: object
+      required: [id, type, message, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [quote_submitted, site_created, site_launched, site_updated, quote_updated]
+        message:
+          type: string
+        entityId:
+          type: ["integer", "null"]
+        entityType:
+          type: ["string", "null"]
+        createdAt:
+          type: string

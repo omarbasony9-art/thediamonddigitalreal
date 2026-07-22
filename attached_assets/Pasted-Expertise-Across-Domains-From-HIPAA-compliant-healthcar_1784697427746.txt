@@ -1,0 +1,35 @@
+Expertise Across Domains
+From HIPAA-compliant healthcare apps to real-time fintech platforms and logistics tracking systems, our teams bring domain knowledge to every build. Explore each industry below to see how we work, or browse our case studies like FloCargo (logistics) and FlowShark (fintech) to see the results.
+
+Passenger airplane flying over a coastal bay
+Travel & Hospitality Software Development
+Custom travel and hospitality apps that power smarter guest experiences — from hotel booking platforms and AI-driven recommendations to customer engagement systems built to scale.
+
+Doctor holding a stethoscope with connected medical service icons
+Healthcare Software Development
+Healthcare needs software that’s secure, compliant, and built for real clinical workflows. We develop telemedicine platforms, patient portals, and care management systems that providers actually trust.
+
+Accountant using a calculator over financial reports
+Accounting Software Development
+Custom accounting software that automates bookkeeping, simplifies reporting, and ensures compliance — built to give finance teams full control over their financial operations.
+
+Hand using a tablet showing financial growth charts and analytics
+Fintech Software Development
+Secure, high-performance fintech products — from payment gateways and trading platforms to banking dashboards and investment analytics tools built for speed and scale.
+
+Agent handing house keys to a buyer beside a model house
+Real Estate Software Development
+Custom PropTech platforms — from property listing portals and tenant management systems to virtual tour integrations and real estate CRM tools built for agents, landlords, and developers.
+
+Cargo plane, truck, and shipping containers at a freight terminal
+Logistics Software Development
+Logistics platforms with real-time shipment tracking, route optimization, inventory management and operational dashboards — built to bring visibility and control to complex supply chains.
+
+Miniature shopping cart with parcels on a laptop keyboard
+eCommerce Software Development
+Conversion-optimized e-commerce platforms — custom storefronts, inventory and order management systems, and AI-powered recommendation engines built to make buying seamless and selling smarter.
+
+Graduation cap resting on a tall stack of colorful books
+Education Software Development
+EdTech solutions that make learning accessible — from LMS platforms and virtual classrooms to student portals and progress tracking tools built for schools, universities, and online educators.
+
