@@ -119,7 +119,7 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            The Diamond Digital builds custom software, web platforms, and digital products that are sharp by design, scalable by architecture, and exceptional by default. No templates. No shortcuts.
+            Diamond Digital builds custom software, web platforms, and digital products that are sharp by design, scalable by architecture, and exceptional by default. No templates. No shortcuts.
           </motion.p>
 
           <motion.div
