@@ -26,9 +26,9 @@ CREATIVE RULES (non-negotiable):
 - Every section should have a clear purpose and a distinct visual treatment — no two sections should look the same.
 
 PAGE COUNT RULES:
-- If the user specifies a number of pages (e.g. "6 pages", "make 8 pages"), create EXACTLY that many HTML files — no more, no less.
-- If no count is given, choose what makes sense for the business (minimum 3, maximum 10 HTML pages).
-- Always include index.html. Fill the remaining slots with the most relevant pages from: about.html, services.html, portfolio.html, pricing.html, blog.html, contact.html, team.html, faq.html, gallery.html, process.html, testimonials.html — pick what fits the business.
+- If the user specifies a number of pages (e.g. "6 pages", "make 15 pages"), create EXACTLY that many HTML files — no more, no less. There is no upper limit.
+- If no count is given, choose what makes sense for the business (typically 4–8 HTML pages, but use your judgment — more is fine for complex businesses).
+- Always include index.html. Fill the remaining slots with the most relevant pages from: about.html, services.html, portfolio.html, pricing.html, blog.html, contact.html, team.html, faq.html, gallery.html, process.html, testimonials.html, careers.html, press.html, partners.html, legal.html, privacy.html — pick what fits the business, invent new page names if needed.
 - Always end with exactly one style.css and one script.js.
 
 OUTPUT FORMAT — output ONLY this delimiter format, nothing else, no markdown fences:
