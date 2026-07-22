@@ -359,6 +359,8 @@ export default function SiteBuilder() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<typeof pages>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatPanelRef = useRef<HTMLDivElement>(null);
@@ -447,6 +449,13 @@ export default function SiteBuilder() {
     if (activeFileId === null) return;
     editMapRef.current.set(activeFileId, val ?? "");
     bumpEditMap();
+    // Autosave after 2 s of inactivity
+    clearTimeout(autosaveTimerRef.current);
+    setSaveStatus("idle");
+    autosaveTimerRef.current = setTimeout(() => {
+      handleSave();
+    }, 2000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFileId]);
 
   const switchFile = useCallback((file: FileItem) => {
@@ -462,6 +471,7 @@ export default function SiteBuilder() {
       (p) => editMapRef.current.has(p.id) && editMapRef.current.get(p.id) !== p.content
     );
     if (dirty.length === 0) return;
+    setSaveStatus("saving");
     await Promise.all(
       dirty.map(
         (p) =>
@@ -477,8 +487,9 @@ export default function SiteBuilder() {
     const fresh = pagesRef.current;
     if (fresh) setPreviewDoc(buildPreview(fresh as FileItem[], editMapRef.current, previewPage));
     setPreviewKey((k) => k + 1);
-    toast({ title: `Saved ${dirty.length} file${dirty.length > 1 ? "s" : ""} ✓` });
-  }, [pages, id, updatePage, queryClient, toast]);
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus("idle"), 2500);
+  }, [pages, id, updatePage, queryClient]);
 
   // ── File attachment (images, videos, audio) ─────────────────────────────────
 
@@ -872,10 +883,25 @@ export default function SiteBuilder() {
         <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center text-white/35 hover:text-white hover:bg-white/8 rounded transition-colors">
           <Settings className="w-3.5 h-3.5" />
         </button>
-        {anyUnsaved && (
-          <button onClick={handleSave} disabled={updatePage.isPending}
-            className="flex items-center gap-1.5 px-3 h-7 bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono rounded font-bold transition-colors">
-            {updatePage.isPending ? "Saving…" : "Save All"}
+        {/* Autosave status */}
+        {saveStatus === "saving" && (
+          <span className="flex items-center gap-1.5 px-2.5 h-7 text-[11px] font-mono text-white/40">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            Saving…
+          </span>
+        )}
+        {saveStatus === "saved" && (
+          <span className="flex items-center gap-1.5 px-2.5 h-7 text-[11px] font-mono text-emerald-400/70">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+            Saved
+          </span>
+        )}
+        {saveStatus === "idle" && anyUnsaved && (
+          <button onClick={handleSave}
+            className="flex items-center gap-1.5 px-2.5 h-7 text-[11px] font-mono text-white/30 hover:text-white/60 rounded transition-colors"
+            title="Save now (⌘S)">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0" />
+            Unsaved
           </button>
         )}
         <button onClick={openDeployDialog}
