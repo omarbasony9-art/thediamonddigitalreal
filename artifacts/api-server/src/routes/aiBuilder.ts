@@ -108,6 +108,31 @@ CODE:
 - Images: use div.img-placeholder with CSS gradient + aspect-ratio
 - Mobile-first, breakpoints at 768px and 1200px
 
+RESPONSIVE DESIGN — NON-NEGOTIABLE:
+Every site MUST look polished on a 375px phone AND a 1440px desktop. This is not optional.
+
+MOBILE RULES (default styles, no media query):
+- Font sizes via clamp(): e.g. clamp(1rem, 4vw, 1.25rem) for body, clamp(2rem, 8vw, 5rem) for headings
+- Navigation: hamburger menu that slides in from the side or collapses — NO horizontal overflow
+- All sections: padding 1.5rem on mobile, 5rem+ on desktop
+- Images: max-width: 100%; height: auto — never fixed widths
+- Cards/grids: single column on mobile, multi-column on desktop
+- Buttons: min 44px tall, full-width or near-full-width on small screens
+- No horizontal scrollbar ever — test mentally at 375px width
+
+CSS PATTERNS TO USE:
+- Flex containers: flex-wrap: wrap
+- Grid: grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr))
+- Text: use clamp() for ALL headings and key text
+- Sections: padding: clamp(3rem, 8vw, 8rem) clamp(1rem, 5vw, 4rem)
+- Container: max-width: 1200px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem)
+
+HAMBURGER MENU (required):
+- Hidden on desktop (display: none at 768px+)
+- Visible on mobile — 3 bars icon that toggles a full-width dropdown or slide-in drawer
+- Nav links stack vertically, large tap targets (padding: 1rem)
+- Overlay closes menu when tapped
+
 PAGE COUNT:
 - Explicit count → build exactly that many HTML files
 - No count → 4-7 pages, whatever fits the business
@@ -186,7 +211,7 @@ DESIGN STANDARD:
 - Alternating row colors
 - Highlighted totals/summary rows
 - Professional monospaced font for numbers
-- Responsive layout
+- Responsive layout: on mobile the table scrolls horizontally inside a wrapper (overflow-x: auto), with a sticky first column so the row label stays visible. Controls (search, filters) stack vertically on small screens.
 
 SAMPLE DATA:
 - Always populate with 8-15 realistic rows of data
@@ -243,8 +268,16 @@ TECHNICAL RULES:
 - All CSS in style.css with :root variables
 - All JS in script.js — well-organized, commented
 - No frameworks. Pure HTML + CSS + JS.
-- Mobile-responsive
 - Accessible (proper labels, keyboard nav)
+
+RESPONSIVE DESIGN — NON-NEGOTIABLE:
+Must work perfectly at 375px (phone) AND 1440px (desktop). No horizontal scroll. No tiny text. No broken layouts.
+- Font sizes: clamp() for all headings and body text
+- Layouts: CSS Grid with auto-fit/minmax or Flexbox with flex-wrap
+- Padding/margin: clamp() for breathing room at every size
+- Inputs/buttons: min 44px height, full width on mobile
+- Container: max-width + padding: 0 clamp(1rem, 4vw, 2rem)
+- Navigation collapses cleanly on mobile
 
 DESIGN RULES:
 - Every app needs a concept — a specific visual language
