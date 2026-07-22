@@ -26,11 +26,9 @@ CREATIVE RULES (non-negotiable):
 - Every section should have a clear purpose and a distinct visual treatment — no two sections should look the same.
 
 PAGE COUNT RULES:
-- Decide how many pages make sense for the business. Use between 3 and 8 HTML pages.
-- Simple businesses (café, barber, freelancer): 3–4 pages.
-- Medium businesses (agency, gym, restaurant, clinic): 4–6 pages.
-- Complex businesses (SaaS, real estate, law firm, ecommerce): 6–8 pages.
-- Always include index.html. Choose additional pages from: about.html, services.html, portfolio.html, pricing.html, blog.html, contact.html, team.html, faq.html, gallery.html — whatever makes sense.
+- If the user specifies a number of pages (e.g. "6 pages", "make 8 pages"), create EXACTLY that many HTML files — no more, no less.
+- If no count is given, choose what makes sense for the business (minimum 3, maximum 10 HTML pages).
+- Always include index.html. Fill the remaining slots with the most relevant pages from: about.html, services.html, portfolio.html, pricing.html, blog.html, contact.html, team.html, faq.html, gallery.html, process.html, testimonials.html — pick what fits the business.
 - Always end with exactly one style.css and one script.js.
 
 OUTPUT FORMAT — output ONLY this delimiter format, nothing else, no markdown fences:
