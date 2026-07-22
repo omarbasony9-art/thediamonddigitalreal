@@ -42,13 +42,18 @@ function FileIcon({ slug, className = "w-3.5 h-3.5" }: { slug: string; className
   return <File className={className} />;
 }
 
-const buildPreview = (files: FileItem[]) => {
-  const html = files.find((f) => getLang(f.slug) === "html" && f.slug === "index.html")
-    || files.find((f) => getLang(f.slug) === "html");
+/**
+ * Build preview doc by inlining CSS and JS into the HTML.
+ * Uses the editMap (in-memory unsaved edits) over DB content so switching
+ * tabs never loses edits from other files in the live preview.
+ */
+const buildPreview = (files: FileItem[], editMap: Map<number, string>) => {
+  const resolve = (f: FileItem) => editMap.has(f.id) ? editMap.get(f.id)! : f.content;
+  const html = files.find((f) => f.slug === "index.html") || files.find((f) => f.slug.endsWith(".html"));
   if (!html) return `<html><body style="font:14px system-ui;color:#666;padding:48px;text-align:center;background:#111"><p>No HTML file yet. Ask AI to build your site.</p></body></html>`;
-  let doc = html.content;
-  const styles = files.filter((f) => getLang(f.slug) === "css").map((f) => `<style>${f.content}</style>`).join("\n");
-  const scripts = files.filter((f) => getLang(f.slug) === "javascript").map((f) => `<script>${f.content}<\/script>`).join("\n");
+  let doc = resolve(html);
+  const styles = files.filter((f) => f.slug.endsWith(".css")).map((f) => `<style>${resolve(f)}</style>`).join("\n");
+  const scripts = files.filter((f) => f.slug.endsWith(".js")).map((f) => `<script>${resolve(f)}<\/script>`).join("\n");
   doc = doc.includes("</head>") ? doc.replace("</head>", `${styles}\n</head>`) : styles + doc;
   doc = doc.includes("</body>") ? doc.replace("</body>", `${scripts}\n</body>`) : doc + scripts;
   return doc;
@@ -110,7 +115,6 @@ export default function SiteBuilder() {
   const queryClient = useQueryClient();
 
   const [activeFileId, setActiveFileId] = useState<number | null>(null);
-  const [editedContent, setEditedContent] = useState("");
   const [previewDoc, setPreviewDoc] = useState("");
   const [previewKey, setPreviewKey] = useState(0);
   const [addingFile, setAddingFile] = useState(false);
@@ -121,6 +125,12 @@ export default function SiteBuilder() {
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  // Track unsaved edits for ALL files — keyed by file id.
+  // This is the source-of-truth for "current content" while editing.
+  // Switching tabs NEVER clears another file's edits.
+  const editMapRef = useRef<Map<number, string>>(new Map());
+  const [editMapVersion, setEditMapVersion] = useState(0); // bump to force re-renders
+  const bumpEditMap = () => setEditMapVersion((v) => v + 1);
 
   const [aiMessages, setAiMessages] = useState<AiMsg[]>([{ role: "welcome" }]);
   const [aiInput, setAiInput] = useState("");
@@ -152,26 +162,30 @@ export default function SiteBuilder() {
     })();
   }, [pages, pagesLoading]);
 
+  // Select index.html on initial load
   useEffect(() => {
     if (pages && pages.length > 0 && activeFileId === null) {
       const html = pages.find((p) => p.slug === "index.html") || pages.find((p) => p.slug.endsWith(".html")) || pages[0];
       setActiveFileId(html.id);
-      setEditedContent(html.content);
     }
   }, [pages, activeFileId]);
 
+  // Rebuild preview (debounced) whenever edit map or pages change
   useEffect(() => {
     if (!pages) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const merged = pages.map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p));
-      setPreviewDoc(buildPreview(merged as FileItem[]));
-    }, 600);
+      setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current));
+    }, 400);
     return () => clearTimeout(debounceRef.current);
-  }, [editedContent, pages, activeFileId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMapVersion, pages]);
 
+  // When pages first arrive (or DB refreshes), set initial preview immediately
   useEffect(() => {
-    if (pages && pages.length > 0) setPreviewDoc(buildPreview(pages as FileItem[]));
+    if (pages && pages.length > 0) {
+      setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current));
+    }
   }, [pages]);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
@@ -181,28 +195,54 @@ export default function SiteBuilder() {
   }, [site]);
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
-  const hasUnsaved = activeFile && editedContent !== activeFile.content;
+  // "Current" content for the active file: prefer in-memory edit, fall back to DB
+  const activeContent = activeFileId !== null && editMapRef.current.has(activeFileId)
+    ? editMapRef.current.get(activeFileId)!
+    : (activeFile?.content ?? "");
+  // Dirty = in-memory edit differs from DB
+  const hasUnsaved = activeFile && editMapRef.current.has(activeFile.id) && editMapRef.current.get(activeFile.id) !== activeFile.content;
+  const anyUnsaved = pages?.some((p) => editMapRef.current.has(p.id) && editMapRef.current.get(p.id) !== p.content);
 
+  const handleEditorChange = useCallback((val: string | undefined) => {
+    if (activeFileId === null) return;
+    editMapRef.current.set(activeFileId, val ?? "");
+    bumpEditMap();
+  }, [activeFileId]);
+
+  // Switching tabs is instant — no data loss
   const switchFile = useCallback((file: FileItem) => {
     setActiveFileId(file.id);
-    setEditedContent(file.content);
+    // If the file has no in-memory edit yet, seed from DB
+    if (!editMapRef.current.has(file.id)) {
+      editMapRef.current.set(file.id, file.content);
+    }
   }, []);
 
-  const handleSave = useCallback(() => {
-    if (!activeFile) return;
-    updatePage.mutate(
-      { id, pageId: activeFile.id, data: { content: editedContent, title: activeFile.title } },
-      {
-        onSuccess: () => {
-          toast({ title: "Saved ✓" });
-          queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
-          const merged = (pages || []).map((p) => p.id === activeFile.id ? { ...p, content: editedContent } : p);
-          setPreviewDoc(buildPreview(merged as FileItem[]));
-          setPreviewKey((k) => k + 1);
-        },
-      }
+  const handleSave = useCallback(async () => {
+    if (!pages) return;
+    // Save all dirty files
+    const dirty = pages.filter(
+      (p) => editMapRef.current.has(p.id) && editMapRef.current.get(p.id) !== p.content
     );
-  }, [activeFile, editedContent, pages, id]);
+    if (dirty.length === 0) return;
+    await Promise.all(
+      dirty.map(
+        (p) =>
+          new Promise<void>((res) =>
+            updatePage.mutate(
+              { id, pageId: p.id, data: { content: editMapRef.current.get(p.id)!, title: p.title } },
+              { onSuccess: () => res(), onError: () => res() }
+            )
+          )
+      )
+    );
+    await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+    // After save, rebuild preview with latest
+    const fresh = pagesRef.current;
+    if (fresh) setPreviewDoc(buildPreview(fresh as FileItem[], editMapRef.current));
+    setPreviewKey((k) => k + 1);
+    toast({ title: `Saved ${dirty.length} file${dirty.length > 1 ? "s" : ""} ✓` });
+  }, [pages, id, updatePage, queryClient, toast]);
 
   const handlePublish = async () => {
     setPublishing(true);
@@ -228,9 +268,18 @@ export default function SiteBuilder() {
     if (!newFileName.trim()) return;
     let slug = newFileName.trim();
     if (!slug.includes(".")) slug += ".html";
+    const starterContent = `<!-- ${slug} -->\n`;
     createPage.mutate(
-      { id, data: { title: slug, slug, content: `<!-- ${slug} -->\n` } },
-      { onSuccess: (f) => { queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) }); setActiveFileId(f.id); setEditedContent(f.content); setNewFileName(""); setAddingFile(false); } }
+      { id, data: { title: slug, slug, content: starterContent } },
+      {
+        onSuccess: (f) => {
+          queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+          editMapRef.current.set(f.id, starterContent);
+          setActiveFileId(f.id);
+          setNewFileName("");
+          setAddingFile(false);
+        },
+      }
     );
   };
 
@@ -238,7 +287,11 @@ export default function SiteBuilder() {
     e.stopPropagation();
     if (!confirm("Delete this file?")) return;
     deletePage.mutate({ id, pageId: fileId }, {
-      onSuccess: () => { if (activeFileId === fileId) { setActiveFileId(null); setEditedContent(""); } queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) }); },
+      onSuccess: () => {
+        editMapRef.current.delete(fileId);
+        if (activeFileId === fileId) setActiveFileId(null);
+        queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
+      },
     });
   };
 
@@ -248,14 +301,13 @@ export default function SiteBuilder() {
     setAiInput("");
 
     const currentPages = pagesRef.current || [];
-    // Always send existing files so AI knows the context
-    const existingFiles = currentPages.map((p) => ({ name: p.slug, content: p.id === activeFileId ? editedContent : p.content }));
+    // Send current in-memory content (including unsaved edits) so AI sees the latest state
+    const existingFiles = currentPages.map((p) => ({
+      name: p.slug,
+      content: editMapRef.current.has(p.id) ? editMapRef.current.get(p.id)! : p.content,
+    }));
 
-    setAiMessages((prev) => [
-      ...prev,
-      { role: "user", text: prompt },
-      { role: "thinking" },
-    ]);
+    setAiMessages((prev) => [...prev, { role: "user", text: prompt }, { role: "thinking" }]);
     setAiLoading(true);
 
     try {
@@ -269,11 +321,10 @@ export default function SiteBuilder() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Generation failed");
 
-      // data.files is now an array: [{ name, content }, ...]
       const fileList: { name: string; content: string }[] = data.files;
       const createdNames: string[] = [];
 
-      // Upsert all returned files sequentially (to avoid DB race)
+      // Upsert all returned files sequentially
       for (const file of fileList) {
         const existing = currentPages.find((p) => p.slug === file.name);
         await new Promise<void>((resolve) => {
@@ -294,23 +345,27 @@ export default function SiteBuilder() {
 
       await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
 
+      // Load AI output into edit map so preview updates immediately without waiting for DB refetch
       const freshPages = pagesRef.current || currentPages;
-      const htmlPage = freshPages.find((p) => p.slug === "index.html") || freshPages.find((p) => p.slug.endsWith(".html"));
-      const htmlFile = fileList.find((f) => f.name === "index.html") || fileList.find((f) => f.name.endsWith(".html"));
-      if (htmlPage && htmlFile) { setActiveFileId(htmlPage.id); setEditedContent(htmlFile.content); }
+      const nameToContent = Object.fromEntries(fileList.map((f) => [f.name, f.content]));
+      for (const p of freshPages) {
+        if (nameToContent[p.slug] !== undefined) {
+          editMapRef.current.set(p.id, nameToContent[p.slug]);
+        }
+      }
+      bumpEditMap();
 
-      // Build merged pages for preview
-      const mergedMap: Record<string, string> = {};
-      fileList.forEach((f) => { mergedMap[f.name] = f.content; });
-      const merged = freshPages.map((p) => mergedMap[p.slug] ? { ...p, content: mergedMap[p.slug] } : p);
-      setPreviewDoc(buildPreview(merged as FileItem[]));
+      // Switch to index.html
+      const htmlPage = freshPages.find((p) => p.slug === "index.html") || freshPages.find((p) => p.slug.endsWith(".html"));
+      if (htmlPage) setActiveFileId(htmlPage.id);
+
       setPreviewKey((k) => k + 1);
 
       setAiMessages((prev) => {
         const copy = [...prev];
         copy[copy.length - 1] = {
           role: "assistant",
-          text: `Here's your website! I created ${createdNames.length} files with full navigation between pages. You can edit any file directly or ask me to make changes.`,
+          text: `Done! Built ${createdNames.length} files with full navigation. Switch between tabs — the preview stays live.`,
           files: createdNames,
         };
         return copy;
@@ -328,7 +383,6 @@ export default function SiteBuilder() {
 
   const isLive = site?.status === "live";
 
-  // Auto-grow textarea
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setAiInput(e.target.value);
     e.target.style.height = "auto";
@@ -353,11 +407,9 @@ export default function SiteBuilder() {
         </div>
         {isLive && <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded shrink-0">LIVE</span>}
         <div className="flex-1" />
-        {/* Preview toggle */}
         <button
           onClick={() => setShowPreview((v) => !v)}
           className={`flex items-center gap-1.5 px-2.5 h-7 text-xs font-mono rounded transition-colors ${showPreview ? "bg-white/10 text-white" : "bg-white/5 text-white/40 hover:text-white/70"}`}
-          title={showPreview ? "Hide preview" : "Show preview"}
         >
           {showPreview ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
           <span className="hidden sm:inline">Preview</span>
@@ -365,21 +417,21 @@ export default function SiteBuilder() {
         <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center text-white/35 hover:text-white hover:bg-white/8 rounded transition-colors">
           <Settings className="w-3.5 h-3.5" />
         </button>
-        {hasUnsaved && (
+        {anyUnsaved && (
           <button onClick={handleSave} disabled={updatePage.isPending}
             className="flex items-center gap-1.5 px-3 h-7 bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono rounded font-bold transition-colors">
-            {updatePage.isPending ? "Saving…" : "Save"}
+            {updatePage.isPending ? "Saving…" : "Save All"}
           </button>
         )}
         {isLive && publishedUrl ? (
           <button onClick={() => setPublishOpen(true)}
-            className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded transition-colors hover:bg-emerald-600/30">
+            className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded hover:bg-emerald-600/30 transition-colors">
             <Globe className="w-3 h-3" /> View Live
           </button>
         ) : (
           <button onClick={handlePublish} disabled={publishing}
             className="flex items-center gap-1.5 px-3 h-7 bg-[#0066ff] hover:bg-[#0052cc] disabled:opacity-50 text-white text-xs font-mono font-bold rounded transition-colors">
-            {publishing ? <><Loader2 className="w-3 h-3 animate-spin" /> Publishing…</> : <><Globe className="w-3 h-3" /> Publish</>}
+            {publishing ? <><Loader2 className="w-3 h-3 animate-spin" />Publishing…</> : <><Globe className="w-3 h-3" />Publish</>}
           </button>
         )}
       </div>
@@ -400,13 +452,14 @@ export default function SiteBuilder() {
               <div className="px-3 py-2 text-[10px] text-white/25 font-mono">Loading…</div>
             ) : pages?.map((file) => {
               const active = file.id === activeFileId;
+              const dirty = editMapRef.current.has(file.id) && editMapRef.current.get(file.id) !== file.content;
               return (
                 <div key={file.id} onClick={() => switchFile(file as FileItem)}
                   className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${active ? "bg-white/8 text-white" : "text-white/40 hover:bg-white/4 hover:text-white/70"}`}>
                   <div className="flex items-center gap-2 text-[11px] font-mono truncate min-w-0">
                     <FileIcon slug={file.slug} className="w-3 h-3 shrink-0 opacity-60" />
                     <span className="truncate">{file.slug}</span>
-                    {active && hasUnsaved && <span className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />}
+                    {dirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Unsaved changes" />}
                   </div>
                   <button onClick={(e) => handleDeleteFile(file.id, e)} className="opacity-0 group-hover:opacity-100 text-white/25 hover:text-red-400 transition-all shrink-0 ml-1">
                     <Trash2 className="w-2.5 h-2.5" />
@@ -428,18 +481,19 @@ export default function SiteBuilder() {
           </div>
         </div>
 
-        {/* EDITOR + optional PREVIEW */}
+        {/* EDITOR + PREVIEW */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* File tabs */}
           <div className="h-9 bg-[#1e1e1e] border-b border-white/6 flex items-end overflow-x-auto shrink-0">
             {pages?.map((file) => {
               const active = file.id === activeFileId;
+              const dirty = editMapRef.current.has(file.id) && editMapRef.current.get(file.id) !== file.content;
               return (
                 <button key={file.id} onClick={() => switchFile(file as FileItem)}
                   className={`flex items-center gap-1.5 px-4 h-full text-[11px] font-mono transition-colors shrink-0 border-r border-white/4 ${active ? "bg-[#0e0e0e] text-white border-t-2 border-t-[#0066ff]" : "text-white/35 hover:text-white/65 hover:bg-white/3"}`}>
                   <FileIcon slug={file.slug} className="w-3 h-3 opacity-70" />
                   {file.slug}
-                  {active && hasUnsaved && <span className="w-1 h-1 rounded-full bg-amber-400" />}
+                  {dirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved" />}
                 </button>
               );
             })}
@@ -450,13 +504,30 @@ export default function SiteBuilder() {
             <div className={showPreview ? "w-1/2 flex flex-col overflow-hidden border-r border-white/6" : "flex-1 flex flex-col overflow-hidden"}>
               {activeFile ? (
                 <Editor
+                  key={activeFileId ?? "none"}
                   height="100%"
                   language={getLang(activeFile.slug)}
-                  value={editedContent}
-                  onChange={(v) => setEditedContent(v || "")}
+                  value={activeContent}
+                  onChange={handleEditorChange}
                   theme="vs-dark"
-                  options={{ minimap: { enabled: false }, fontSize: 12, tabSize: 2, wordWrap: "off", scrollBeyondLastLine: false, automaticLayout: true, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace", fontLigatures: true, cursorBlinking: "smooth", smoothScrolling: true, padding: { top: 12, bottom: 12 }, lineNumbers: "on", bracketPairColorization: { enabled: true } }}
-                  onMount={(editor) => { editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: handleSave }); }}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    tabSize: 2,
+                    wordWrap: "off",
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace",
+                    fontLigatures: true,
+                    cursorBlinking: "smooth",
+                    smoothScrolling: true,
+                    padding: { top: 12, bottom: 12 },
+                    lineNumbers: "on",
+                    bracketPairColorization: { enabled: true },
+                  }}
+                  onMount={(editor) => {
+                    editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: handleSave });
+                  }}
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-white/15 flex-col gap-3">
@@ -466,7 +537,7 @@ export default function SiteBuilder() {
               )}
             </div>
 
-            {/* Preview panel */}
+            {/* Live preview */}
             {showPreview && (
               <div className="w-1/2 flex flex-col overflow-hidden">
                 <div className="h-8 bg-[#1a1a1a] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
@@ -479,22 +550,30 @@ export default function SiteBuilder() {
                     {publishedUrl || "preview"}
                   </div>
                   <button
-                    onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
+                    onClick={() => {
+                      if (pages) setPreviewDoc(buildPreview(pages as FileItem[], editMapRef.current));
+                      setPreviewKey((k) => k + 1);
+                    }}
                     className="text-white/20 hover:text-white/50 transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
                   </button>
                 </div>
-                <iframe key={previewKey} srcDoc={previewDoc} sandbox="allow-scripts" className="flex-1 w-full border-none bg-white" title="preview" />
+                {/* key only changes on explicit refresh — avoids flicker on every keystroke */}
+                <iframe
+                  key={previewKey}
+                  srcDoc={previewDoc}
+                  sandbox="allow-scripts"
+                  className="flex-1 w-full border-none bg-white"
+                  title="preview"
+                />
               </div>
             )}
           </div>
         </div>
 
-        {/* ── AI PANEL (Replit-style) ── */}
+        {/* ── AI PANEL ── */}
         <div className="w-80 shrink-0 border-l border-white/6 bg-[#141414] flex flex-col overflow-hidden">
-
-          {/* AI header */}
           <div className="h-11 flex items-center px-4 border-b border-white/6 shrink-0 gap-2">
             <div className="w-5 h-5 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0">
               <Sparkles className="w-3 h-3 text-white" />
@@ -511,15 +590,13 @@ export default function SiteBuilder() {
             </button>
           </div>
 
-          {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {aiMessages.map((msg, i) => (
               <AiMessage key={i} msg={msg} onSuggestion={handleAiSend} />
             ))}
             <div ref={chatBottomRef} />
           </div>
 
-          {/* Input area */}
           <div className="p-3 border-t border-white/6 shrink-0">
             <div className={`bg-[#1e1e1e] border rounded-xl overflow-hidden transition-colors ${aiLoading ? "border-white/10" : "border-white/12 focus-within:border-[#0066ff]/60"}`}>
               <textarea
@@ -544,8 +621,7 @@ export default function SiteBuilder() {
                 >
                   {aiLoading
                     ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-                    : <Send className="w-3.5 h-3.5 text-white" />
-                  }
+                    : <Send className="w-3.5 h-3.5 text-white" />}
                 </button>
               </div>
             </div>
@@ -554,16 +630,16 @@ export default function SiteBuilder() {
         </div>
       </div>
 
-      {/* ── STATUS BAR ── */}
+      {/* STATUS BAR */}
       <div className="h-5 bg-[#0066ff] flex items-center px-4 gap-4 text-[10px] text-white/70 shrink-0 font-mono">
         <span>{activeFile ? getLang(activeFile.slug).toUpperCase() : ""}</span>
         <span className="flex-1" />
         <span>{pages?.length ?? 0} files</span>
-        {hasUnsaved && <span className="text-white">● Unsaved changes</span>}
-        <span className="hidden sm:inline">Ctrl+S to save</span>
+        {anyUnsaved && <span className="text-white">● Unsaved</span>}
+        <span className="hidden sm:inline">Ctrl+S to save all</span>
       </div>
 
-      {/* ── PUBLISH DIALOG ── */}
+      {/* PUBLISH DIALOG */}
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
         <DialogContent className="sm:max-w-md bg-[#1a1a1a] border-white/10 rounded-xl text-white">
           <DialogHeader>
@@ -593,19 +669,17 @@ export default function SiteBuilder() {
             </div>
             <div className="border border-white/8 bg-white/3 rounded-lg p-3 text-xs text-white/35 leading-relaxed">
               <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5 text-white/40" />
-              This URL is always live. To use a custom domain, point your DNS or use Cloudflare to proxy it.
+              This URL is always live. Republish anytime to push new changes.
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ── SETTINGS ── */}
       {site && <SiteSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} site={site} updateSite={updateSite} queryClient={queryClient} />}
     </div>
   );
 }
 
-// ── AI message renderer ──
 function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string) => void }) {
   if (msg.role === "welcome") {
     return (
@@ -614,19 +688,14 @@ function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string
           <div className="w-6 h-6 rounded-md bg-[#0066ff] flex items-center justify-center shrink-0 mt-0.5">
             <Sparkles className="w-3.5 h-3.5 text-white" />
           </div>
-          <div className="flex-1">
-            <p className="text-sm text-white/80 leading-relaxed">
-              Hi! I build complete multi-page websites from a single description — homepage, about, services, plus shared CSS and JS.
-            </p>
-          </div>
+          <p className="flex-1 text-sm text-white/80 leading-relaxed">
+            Hi! Describe any website and I'll build a complete multi-page site — homepage, about, services, with unique design, real copy, and smooth animations.
+          </p>
         </div>
         <div className="flex flex-col gap-1.5 pl-8">
           {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => onSuggestion(s)}
-              className="text-left text-xs text-white/50 hover:text-white/80 bg-white/4 hover:bg-white/8 border border-white/8 hover:border-white/15 rounded-lg px-3 py-2 transition-all"
-            >
+            <button key={s} onClick={() => onSuggestion(s)}
+              className="text-left text-xs text-white/50 hover:text-white/80 bg-white/4 hover:bg-white/8 border border-white/8 hover:border-white/15 rounded-lg px-3 py-2 transition-all">
               {s}
             </button>
           ))}
@@ -642,13 +711,13 @@ function AiMessage({ msg, onSuggestion }: { msg: AiMsg; onSuggestion: (s: string
           <Sparkles className="w-3.5 h-3.5 text-white" />
         </div>
         <div className="flex-1 bg-white/4 border border-white/8 rounded-2xl rounded-tl-sm px-3.5 py-3">
-          <div className="flex items-center gap-2 text-white/40">
+          <div className="flex items-center gap-2 text-white/40 mb-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0066ff]" />
-            <span className="text-xs font-mono">Building your website…</span>
+            <span className="text-xs font-mono">Designing & building…</span>
           </div>
-          <div className="flex gap-1 mt-2">
+          <div className="flex flex-wrap gap-1">
             {["index.html", "about.html", "services.html", "style.css", "script.js"].map((f, i) => (
-              <span key={f} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-white/25 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }}>{f}</span>
+              <span key={f} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-white/25 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }}>{f}</span>
             ))}
           </div>
         </div>

@@ -12,37 +12,45 @@ const requireAdminAuth = (req: any, res: any, next: any) => {
   catch { res.status(401).json({ error: "Invalid or expired token" }); }
 };
 
-// Multi-page delimiter format — never breaks on HTML/CSS/JS characters
-const SYSTEM_PROMPT = `You are an elite web designer and developer. Build complete, multi-page professional websites.
+const SYSTEM_PROMPT = `You are a world-class creative director and senior front-end engineer. You don't build generic websites — you craft distinctive digital experiences that feel like they were made by a boutique agency charging $50,000.
 
-Output ONLY the following delimiter format — nothing else, no markdown, no commentary:
+Every project starts with a unique visual concept: pick a specific mood, palette story, and layout personality that fits the brief. Then execute it with precision.
+
+CREATIVE RULES (non-negotiable):
+- Invent a specific color story: e.g. deep obsidian + acid lime, midnight navy + molten copper, charcoal + electric violet. Never default to generic blue/grey.
+- Typography: pair a display typeface (use Google Fonts via @import) with a body font. Use dramatic size contrast — hero headings should be 6–10vw.
+- Layout: break the grid. Use asymmetric sections, overlapping elements, diagonal clip-paths, sticky scrolling effects, full-bleed images with text overlaid.
+- Motion: every interactive element has a micro-interaction. Use CSS transitions and keyframe animations liberally — hover lifts, glow pulses, fade-ins, slide-ups.
+- Write REAL copy that sounds like it was written by a copywriter who knows the industry. No placeholders, no Lorem Ipsum.
+- Make the hero section dramatic: full-screen, with a strong visual statement, a punchy headline, and a clear CTA.
+- Every section should have a clear purpose and a distinct visual treatment — no two sections should look the same.
+
+OUTPUT FORMAT — output ONLY this delimiter format, nothing else, no markdown fences:
 
 <<<FILE:index.html>>>
-(complete HTML for the homepage)
+(homepage — hero, features/benefits, testimonial or social proof, CTA)
 <<<FILE:about.html>>>
-(complete HTML for the About page)
+(about page — story, team/founder, mission/values, timeline or credentials)
 <<<FILE:services.html>>>
-(complete HTML for a Services or relevant second page)
+(services or portfolio page — what they offer, pricing hint, process, CTA)
 <<<FILE:style.css>>>
-(complete shared CSS)
+(all shared CSS — custom properties, resets, typography, layout, animations)
 <<<FILE:script.js>>>
-(complete shared JavaScript)
+(shared JS — mobile nav, scroll animations, IntersectionObserver, parallax, counters)
 <<<END>>>
 
-RULES:
-- Always output exactly these 5 files: index.html, about.html, services.html (or a relevant name), style.css, script.js
-- Every HTML file must include <link rel="stylesheet" href="style.css"> and <script src="script.js"></script>
-- Navigation in every HTML file must link to all other pages using relative hrefs (e.g. href="about.html")
-- Write REAL copy — no "Lorem ipsum", no "[Company Name]", no placeholder text
-- CSS: stunning dark/modern design, strong color palette, fully responsive with hamburger mobile nav, smooth animations, hover effects, CSS custom properties
-- JS: mobile nav toggle, smooth scroll, IntersectionObserver fade-in, active nav link highlighting
-- Output ONLY the delimited sections — nothing before <<<FILE:index.html>>> or after <<<END>>>`;
+TECHNICAL REQUIREMENTS:
+- Every HTML file: <link rel="stylesheet" href="style.css"> in <head>, <script src="script.js"></script> before </body>
+- Navigation in every HTML page links to all 3 pages with relative hrefs
+- CSS: use CSS custom properties (--color-*, --font-*) at :root, clamp() for fluid sizing, @keyframes for animations
+- JS: mobile nav toggle, IntersectionObserver fade-in-up for all sections, smooth scroll, active nav link based on current page filename
+- Google Fonts: pick two complementary fonts and load them via @import in the CSS
+- Output ONLY the delimited sections. Do NOT write anything before <<<FILE:index.html>>> or after <<<END>>>`;
 
 interface ParsedFile { name: string; content: string }
 
 function parseDelimited(raw: string): ParsedFile[] | null {
   const files: ParsedFile[] = [];
-  // Match <<<FILE:name>>> ... next delimiter
   const regex = /<<<FILE:([^>]+)>>>([\s\S]*?)(?=<<<FILE:|<<<END>>>)/g;
   let match;
   while ((match = regex.exec(raw)) !== null) {
@@ -64,7 +72,7 @@ router.post("/admin/ai/generate", requireAdminAuth, async (req: any, res: any): 
     let userMessage = `Build a website: ${description}`;
     if (existingFiles && existingFiles.length > 0) {
       const filesText = existingFiles.map((f: any) => `### ${f.name}:\n${f.content}`).join("\n\n");
-      userMessage = `Current files:\n\n${filesText}\n\nRequest: ${description}\n\nReturn all files in the required format.`;
+      userMessage = `Current site files:\n\n${filesText}\n\n---\nNew request: ${description}\n\nRevise or rebuild the site. Return all 5 files in the required delimiter format.`;
     }
 
     const response = await openai.chat.completions.create({
