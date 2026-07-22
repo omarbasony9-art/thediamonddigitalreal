@@ -21,6 +21,7 @@ import NotFound from "./pages/not-found";
 // Layouts
 import { PublicLayout } from "./components/layout/PublicLayout";
 import { ProtectedAdminRoute } from "./components/layout/ProtectedAdminRoute";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -167,6 +168,7 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <ClerkQueryClientCacheInvalidator />
+          <ScrollToTop />
           <Switch>
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
