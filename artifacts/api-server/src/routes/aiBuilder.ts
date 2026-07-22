@@ -186,7 +186,7 @@ This is a fresh build. Invent a unique creative concept for this specific brief.
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-sol",
       max_completion_tokens: 60000,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },

@@ -601,7 +601,7 @@ export default function SiteBuilder() {
               <Sparkles className="w-3 h-3 text-white" />
             </div>
             <span className="text-sm font-semibold text-white">AI</span>
-            <span className="text-[10px] font-mono text-white/25 ml-0.5">gpt‑5.6‑terra</span>
+            <span className="text-[10px] font-mono text-white/25 ml-0.5">gpt‑5.6‑sol</span>
             {queueLength > 0 && (
               <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-[9px] font-mono text-amber-400">
                 {queueLength} queued
