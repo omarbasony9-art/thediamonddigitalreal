@@ -97,18 +97,18 @@ export default function About() {
       <div className="container mx-auto">
 
         {/* ── HEADER ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-32">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-16 md:mb-32">
           <motion.div
             initial={{ opacity: 0, x: -24 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
           >
             <p className="text-xs font-mono text-primary tracking-widest mb-4 uppercase">About Software Diamond</p>
-            <h1 className="text-5xl md:text-6xl font-display font-black text-white mb-8 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-black text-white mb-8 leading-tight break-words">
               ENGINEERING <br />
               <span className="text-primary">DONE RIGHT.</span>
             </h1>
-            <p className="text-xl text-muted-foreground leading-relaxed mb-6">
+            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-6">
               Most agencies build websites. We engineer software. The difference shows in performance, stability, and the fact that what we ship still works two years later without emergency patches.
             </p>
             <p className="text-muted-foreground leading-relaxed">
