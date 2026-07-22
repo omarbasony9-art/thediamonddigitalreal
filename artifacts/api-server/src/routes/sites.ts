@@ -172,6 +172,32 @@ router.post("/sites/:id/launch", requireAdminAuth, async (req, res): Promise<voi
   res.json(site);
 });
 
+// Publish a site — marks it live, returns the hosted URL (no custom domain needed)
+router.post("/sites/:id/publish", requireAdminAuth, async (req: any, res: any): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const host = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || req.headers.host || "localhost";
+  const publishedUrl = `https://${host}/api/s/${id}/`;
+
+  const [site] = await db
+    .update(sitesTable)
+    .set({ status: "live", domain: publishedUrl, launchedAt: new Date() })
+    .where(eq(sitesTable.id, id))
+    .returning();
+
+  if (!site) { res.status(404).json({ error: "Site not found" }); return; }
+
+  await db.insert(activityLogTable).values({
+    type: "site_launched",
+    message: `Site "${site.projectName}" published at ${publishedUrl}`,
+    entityId: site.id,
+    entityType: "site",
+  });
+
+  res.json({ ...site, publishedUrl });
+});
+
 // List site pages (admin only)
 router.get("/sites/:id/pages", requireAdminAuth, async (req, res): Promise<void> => {
   const params = ListSitePagesParams.safeParse(req.params);

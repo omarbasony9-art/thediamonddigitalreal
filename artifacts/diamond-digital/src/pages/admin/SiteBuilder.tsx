@@ -2,26 +2,24 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link } from "wouter";
 import Editor from "@monaco-editor/react";
 import {
-  useGetSite, useUpdateSite, useLaunchSite, useListSitePages,
+  useGetSite, useUpdateSite, useListSitePages,
   useCreateSitePage, useUpdateSitePage, useDeleteSitePage,
   getGetSiteQueryKey, getListSitePagesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Play, RefreshCw, Settings, Plus, Trash2, FileCode,
-  CheckCircle2, Copy, AlertTriangle, ChevronRight,
-  Sparkles, Send, Bot, Loader2, Files,
+  ArrowLeft, RefreshCw, Settings, Plus, Trash2, FileCode,
+  Copy, AlertTriangle, ChevronRight,
+  Sparkles, Send, Bot, Loader2, Files, Globe, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type FileItem = { id: number; title: string; slug: string; content: string; order: number };
-type AiMsg = { role: "user" | "ai" | "system"; text: string; };
+type AiMsg = { role: "user" | "ai" | "system"; text: string };
 
-// ── Helpers ────────────────────────────────────────────────────────────────
 const getLang = (slug: string) => {
   if (slug.endsWith(".html")) return "html";
   if (slug.endsWith(".css")) return "css";
@@ -45,7 +43,6 @@ const buildPreview = (files: FileItem[]) => {
   return doc;
 };
 
-// ── Starters ───────────────────────────────────────────────────────────────
 const STARTERS: Omit<FileItem, "id">[] = [
   { title: "index.html", slug: "index.html", order: 0, content: `<!DOCTYPE html>
 <html lang="en">
@@ -59,14 +56,14 @@ const STARTERS: Omit<FileItem, "id">[] = [
   <header class="header">
     <div class="logo">My Brand</div>
     <nav>
-      <a href="#">Home</a>
-      <a href="#">About</a>
-      <a href="#">Contact</a>
+      <a href="#about">About</a>
+      <a href="#services">Services</a>
+      <a href="#contact">Contact</a>
     </nav>
   </header>
   <section class="hero">
     <h1>Build Something Amazing</h1>
-    <p>Your website starts here. Use the AI on the left to build it instantly.</p>
+    <p>Describe your website to the AI on the left and watch it come to life in seconds.</p>
     <button class="btn">Get Started</button>
   </section>
   <footer><p>&copy; 2026 My Website</p></footer>
@@ -79,23 +76,21 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f1a; colo
 .logo { font-weight: 800; font-size: 1.1rem; color: #00cfff; letter-spacing: 1px; }
 nav a { color: #aaa; text-decoration: none; margin-left: 1.5rem; transition: color .2s; }
 nav a:hover { color: #fff; }
-.hero { text-align: center; padding: 6rem 2rem; background: radial-gradient(ellipse at 50% 0%, rgba(0,207,255,.08) 0%, transparent 60%); }
+.hero { text-align: center; padding: 6rem 2rem; }
 .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; margin-bottom: 1rem; background: linear-gradient(135deg, #fff 0%, #00cfff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .hero p { color: #888; font-size: 1.1rem; margin-bottom: 2rem; }
-.btn { background: #00cfff; color: #0f0f1a; border: none; padding: .85rem 2rem; font-size: .95rem; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+.btn { background: #00cfff; color: #0f0f1a; border: none; padding: .85rem 2rem; font-size: .95rem; font-weight: 700; cursor: pointer; border-radius: 4px; }
 .btn:hover { opacity: .85; }
-footer { text-align: center; padding: 2rem; color: #555; border-top: 1px solid rgba(255,255,255,.06); font-size: .85rem; }` },
+footer { text-align: center; padding: 2rem; color: #555; border-top: 1px solid rgba(255,255,255,.06); }` },
   { title: "script.js", slug: "script.js", order: 2, content: `console.log('Site loaded!');` },
 ];
 
-// ── Main Component ─────────────────────────────────────────────────────────
 export default function SiteBuilder() {
   const params = useParams();
   const id = Number(params.id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Editor state
   const [activeFileId, setActiveFileId] = useState<number | null>(null);
   const [editedContent, setEditedContent] = useState("");
   const [previewDoc, setPreviewDoc] = useState("");
@@ -103,37 +98,30 @@ export default function SiteBuilder() {
   const [addingFile, setAddingFile] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [seeding, setSeeding] = useState(false);
-
-  // Dialogs
-  const [launchOpen, setLaunchOpen] = useState(false);
-  const [launchDomain, setLaunchDomain] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
-  // Left panel
   const [leftTab, setLeftTab] = useState<"files" | "ai">("ai");
-
-  // AI state
   const [aiMessages, setAiMessages] = useState<AiMsg[]>([
-    { role: "system", text: "Hi! I'm your AI web builder. Describe the website you want and I'll build the full HTML, CSS, and JS for you instantly.\n\nTry something like:\n• \"A dark barbershop site with booking, gallery & neon accents\"\n• \"A law firm homepage with navy blue theme and contact form\"\n• \"A restaurant site with menu, reservations, and warm earthy colors\"" },
+    { role: "system", text: "I build complete, professional websites from a single description.\n\nTry:\n• \"Dark barbershop with neon green accents, booking section & gallery\"\n• \"Luxury real estate agency with full-screen hero and property listings\"\n• \"Minimalist SaaS landing page with pricing table and testimonials\"\n• \"Gym website with bold typography, class schedule and trainer bios\"\n\nBe specific — the more detail you give, the better the result." },
   ]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMode, setAiMode] = useState<"fresh" | "improve">("fresh");
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<typeof pages>(undefined);
-
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const { data: site } = useGetSite(id, { query: { queryKey: getGetSiteQueryKey(id) } });
   const { data: pages, isLoading: pagesLoading } = useListSitePages(id, { query: { queryKey: getListSitePagesQueryKey(id) } });
 
   const updateSite = useUpdateSite();
-  const launchSite = useLaunchSite();
   const createPage = useCreateSitePage();
   const updatePage = useUpdateSitePage();
   const deletePage = useDeleteSitePage();
 
-  // Keep pages in a ref so AI callbacks always have fresh data
   useEffect(() => { pagesRef.current = pages; }, [pages]);
 
   // Seed starters
@@ -148,7 +136,6 @@ export default function SiteBuilder() {
     })();
   }, [pages, pagesLoading]);
 
-  // Select first file on load
   useEffect(() => {
     if (pages && pages.length > 0 && activeFileId === null) {
       const html = pages.find((p) => p.slug.endsWith(".html")) || pages[0];
@@ -164,7 +151,7 @@ export default function SiteBuilder() {
     debounceRef.current = setTimeout(() => {
       const merged = pages.map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p));
       setPreviewDoc(buildPreview(merged as FileItem[]));
-    }, 500);
+    }, 600);
     return () => clearTimeout(debounceRef.current);
   }, [editedContent, pages, activeFileId]);
 
@@ -172,10 +159,12 @@ export default function SiteBuilder() {
     if (pages && pages.length > 0) setPreviewDoc(buildPreview(pages as FileItem[]));
   }, [pages]);
 
-  // Auto-scroll chat
+  useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [aiMessages]);
+
+  // Restore publishedUrl from site.domain if it looks like our hosted URL
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [aiMessages]);
+    if (site?.domain && site.domain.includes("/api/s/")) setPublishedUrl(site.domain);
+  }, [site]);
 
   const activeFile = pages?.find((p) => p.id === activeFileId) || pages?.[0];
   const hasUnsaved = activeFile && editedContent !== activeFile.content;
@@ -185,7 +174,7 @@ export default function SiteBuilder() {
     setEditedContent(file.content);
   }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!activeFile) return;
     updatePage.mutate(
       { id, pageId: activeFile.id, data: { content: editedContent, title: activeFile.title } },
@@ -199,6 +188,27 @@ export default function SiteBuilder() {
         },
       }
     );
+  }, [activeFile, editedContent, pages, id]);
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const token = localStorage.getItem("admin_token");
+      const res = await fetch(`${import.meta.env.BASE_URL}api/sites/${id}/publish`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Publish failed");
+      setPublishedUrl(data.publishedUrl);
+      setPublishOpen(true);
+      queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
+      toast({ title: "🚀 Published!", description: "Your site is live." });
+    } catch (err: any) {
+      toast({ title: "Publish failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const handleAddFile = () => {
@@ -207,14 +217,7 @@ export default function SiteBuilder() {
     if (!slug.includes(".")) slug += ".html";
     createPage.mutate(
       { id, data: { title: slug, slug, content: `<!-- ${slug} -->\n` } },
-      {
-        onSuccess: (f) => {
-          queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
-          setActiveFileId(f.id); setEditedContent(f.content);
-          setNewFileName(""); setAddingFile(false);
-          toast({ title: `Created ${slug}` });
-        },
-      }
+      { onSuccess: (f) => { queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) }); setActiveFileId(f.id); setEditedContent(f.content); setNewFileName(""); setAddingFile(false); toast({ title: `Created ${slug}` }); } }
     );
   };
 
@@ -222,27 +225,10 @@ export default function SiteBuilder() {
     e.stopPropagation();
     if (!confirm("Delete this file?")) return;
     deletePage.mutate({ id, pageId: fileId }, {
-      onSuccess: () => {
-        if (activeFileId === fileId) { setActiveFileId(null); setEditedContent(""); }
-        queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
-      },
+      onSuccess: () => { if (activeFileId === fileId) { setActiveFileId(null); setEditedContent(""); } queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) }); },
     });
   };
 
-  const handleLaunch = async () => {
-    if (!launchDomain.trim()) return;
-    const domain = launchDomain.replace(/^https?:\/\//i, "").trim();
-    await new Promise<void>((r) => updateSite.mutate({ id, data: { domain } }, { onSuccess: () => r(), onError: () => r() }));
-    launchSite.mutate({ id }, {
-      onSuccess: () => {
-        setLaunchOpen(false);
-        toast({ title: "Site launched!", description: `${domain} is now live.` });
-        queryClient.invalidateQueries({ queryKey: getGetSiteQueryKey(id) });
-      },
-    });
-  };
-
-  // ── AI GENERATE ────────────────────────────────────────────────────────
   const handleAiSend = async () => {
     const prompt = aiInput.trim();
     if (!prompt || aiLoading) return;
@@ -269,14 +255,14 @@ export default function SiteBuilder() {
       });
 
       const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Generation failed");
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Generation failed");
-      }
-
-      // Apply files
       const { html, css, js } = data.files;
-      const fileMap: Record<string, string> = { "index.html": html, "style.css": css, "script.js": js };
+      const fileMap: Record<string, string> = {
+        "index.html": html,
+        ...(css ? { "style.css": css } : {}),
+        ...(js ? { "script.js": js } : {}),
+      };
 
       await Promise.all(
         Object.entries(fileMap).map(([slug, content]) => {
@@ -293,19 +279,14 @@ export default function SiteBuilder() {
 
       await queryClient.invalidateQueries({ queryKey: getListSitePagesQueryKey(id) });
 
-      // Show index.html in editor
       const freshPages = pagesRef.current || currentPages;
       const htmlPage = freshPages.find((p) => p.slug === "index.html");
-      if (htmlPage) {
-        setActiveFileId(htmlPage.id);
-        setEditedContent(html);
-      }
+      if (htmlPage) { setActiveFileId(htmlPage.id); setEditedContent(html); }
 
-      // Rebuild preview
       const merged = freshPages.map((p) => {
-        if (p.slug === "index.html") return { ...p, content: html };
-        if (p.slug === "style.css") return { ...p, content: css };
-        if (p.slug === "script.js") return { ...p, content: js };
+        if (p.slug === "index.html" && html) return { ...p, content: html };
+        if (p.slug === "style.css" && css) return { ...p, content: css };
+        if (p.slug === "script.js" && js) return { ...p, content: js };
         return p;
       });
       setPreviewDoc(buildPreview(merged as FileItem[]));
@@ -313,15 +294,17 @@ export default function SiteBuilder() {
 
       setAiMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = { role: "ai", text: "✅ Done! I've built your website and loaded it into the editor. You can see it live in the preview on the right.\n\nWant to change anything? Just tell me — add a section, change colors, update the copy, anything." };
+        copy[copy.length - 1] = {
+          role: "ai",
+          text: "✅ Done! Your website is ready — check the preview on the right.\n\nWant to refine it? Switch to **Improve** mode and tell me what to change.",
+        };
         return copy;
       });
-
-      toast({ title: "✨ Website built!", description: "Check the preview →" });
+      toast({ title: "✨ Website built!" });
     } catch (err: any) {
       setAiMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = { role: "ai", text: `❌ Something went wrong: ${err.message}. Please try again.` };
+        copy[copy.length - 1] = { role: "ai", text: `❌ ${err.message}. Please try again.` };
         return copy;
       });
     } finally {
@@ -329,7 +312,8 @@ export default function SiteBuilder() {
     }
   };
 
-  // ── RENDER ──────────────────────────────────────────────────────────────
+  const isLive = site?.status === "live";
+
   return (
     <div className="h-screen w-full flex flex-col bg-[#1e1e1e] text-white overflow-hidden" style={{ fontFamily: "system-ui, sans-serif" }}>
 
@@ -346,18 +330,17 @@ export default function SiteBuilder() {
           <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
           <span className="text-white font-semibold truncate">{site?.projectName || "Loading…"}</span>
         </div>
-        {site?.status && (
-          <span className={`px-2 py-0.5 text-[10px] font-mono tracking-wider shrink-0 ${site.status === "live" ? "bg-emerald-500/20 text-emerald-400" : site.status === "building" ? "bg-blue-500/20 text-blue-400" : "bg-white/8 text-white/40"}`}>
-            {site.status.toUpperCase()}
-          </span>
+        {isLive && (
+          <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider bg-emerald-500/20 text-emerald-400 shrink-0">LIVE</span>
         )}
         <div className="flex-1" />
-        <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 rounded transition-colors" title="Settings">
+        <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 rounded transition-colors">
           <Settings className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
-          className="flex items-center gap-1.5 px-2.5 h-7 bg-white/8 hover:bg-white/12 text-white/70 text-xs font-mono rounded transition-colors">
-          <RefreshCw className="w-3 h-3" /> Run
+        <button
+          onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
+          className="flex items-center gap-1.5 px-2.5 h-7 bg-white/8 hover:bg-white/12 text-white/60 text-xs font-mono rounded transition-colors">
+          <RefreshCw className="w-3 h-3" /> Refresh
         </button>
         {hasUnsaved && (
           <button onClick={handleSave} disabled={updatePage.isPending}
@@ -365,37 +348,36 @@ export default function SiteBuilder() {
             {updatePage.isPending ? "Saving…" : "Save"}
           </button>
         )}
-        {site?.status !== "live" ? (
-          <button onClick={() => { setLaunchDomain(site?.domain || ""); setLaunchOpen(true); }}
-            className="flex items-center gap-1.5 px-3 h-7 bg-primary text-[#0a0a10] text-xs font-mono font-bold rounded transition-colors hover:bg-primary/90">
-            <Play className="w-3 h-3 fill-current" /> Launch
+        {isLive && publishedUrl ? (
+          <button onClick={() => setPublishOpen(true)}
+            className="flex items-center gap-1.5 px-3 h-7 bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 text-xs font-mono rounded transition-colors hover:bg-emerald-600/30">
+            <Globe className="w-3 h-3" /> View Live
           </button>
         ) : (
-          <div className="flex items-center gap-1.5 px-3 h-7 bg-emerald-500/15 text-emerald-400 text-xs font-mono rounded border border-emerald-500/25">
-            <CheckCircle2 className="w-3 h-3" /> Live
-          </div>
+          <button onClick={handlePublish} disabled={publishing}
+            className="flex items-center gap-1.5 px-3 h-7 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-mono font-bold rounded transition-colors">
+            {publishing ? <><Loader2 className="w-3 h-3 animate-spin" /> Publishing…</> : <><Globe className="w-3 h-3" /> Publish</>}
+          </button>
         )}
       </div>
 
-      {/* MAIN WORKSPACE */}
+      {/* WORKSPACE */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* LEFT PANEL */}
-        <div className={`flex flex-col border-r border-white/8 shrink-0 bg-[#1a1a2e] transition-all duration-200 ${leftTab === "ai" ? "w-80" : "w-52"}`}>
-
-          {/* Tab bar */}
+        <div className={`flex flex-col border-r border-white/8 shrink-0 bg-[#1a1a2e] ${leftTab === "ai" ? "w-80" : "w-52"}`}>
           <div className="flex border-b border-white/8 shrink-0">
             <button onClick={() => setLeftTab("files")}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-mono transition-colors flex-1 justify-center ${leftTab === "files" ? "text-white border-b-2 border-primary bg-[#252526]" : "text-white/40 hover:text-white/70"}`}>
               <Files className="w-3.5 h-3.5" /> Files
             </button>
             <button onClick={() => setLeftTab("ai")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-mono transition-colors flex-1 justify-center ${leftTab === "ai" ? "text-violet-300 border-b-2 border-violet-400 bg-[#1a1a2e]" : "text-white/40 hover:text-violet-300/70"}`}>
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-mono transition-colors flex-1 justify-center ${leftTab === "ai" ? "text-violet-300 border-b-2 border-violet-400" : "text-white/40 hover:text-violet-300/70"}`}>
               <Sparkles className="w-3.5 h-3.5" /> AI Builder
             </button>
           </div>
 
-          {/* FILES PANEL */}
+          {/* FILES */}
           {leftTab === "files" && (
             <div className="flex-1 bg-[#252526] overflow-y-auto">
               <div className="px-3 py-2 text-[10px] font-mono text-white/30 uppercase tracking-widest border-b border-white/5 flex items-center justify-between">
@@ -404,25 +386,22 @@ export default function SiteBuilder() {
               </div>
               {pagesLoading ? (
                 <div className="px-4 py-3 text-xs text-white/30 font-mono">Loading…</div>
-              ) : (
-                pages?.map((file) => {
-                  const active = file.id === activeFileId;
-                  return (
-                    <div key={file.id} onClick={() => switchFile(file as FileItem)}
-                      className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${active ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}>
-                      <div className="flex items-center gap-2 text-xs font-mono truncate">
-                        <span className="shrink-0">{getIcon(file.slug)}</span>
-                        <span className="truncate">{file.slug}</span>
-                        {active && hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
-                      </div>
-                      <button onClick={(e) => handleDeleteFile(file.id, e)}
-                        className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-all shrink-0 ml-1">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+              ) : pages?.map((file) => {
+                const active = file.id === activeFileId;
+                return (
+                  <div key={file.id} onClick={() => switchFile(file as FileItem)}
+                    className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors ${active ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80"}`}>
+                    <div className="flex items-center gap-2 text-xs font-mono truncate">
+                      <span className="shrink-0">{getIcon(file.slug)}</span>
+                      <span className="truncate">{file.slug}</span>
+                      {active && hasUnsaved && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
                     </div>
-                  );
-                })
-              )}
+                    <button onClick={(e) => handleDeleteFile(file.id, e)} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-all shrink-0 ml-1">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
               {addingFile && (
                 <div className="px-3 py-2 border-t border-white/5">
                   <Input autoFocus value={newFileName} onChange={(e) => setNewFileName(e.target.value)}
@@ -437,10 +416,9 @@ export default function SiteBuilder() {
             </div>
           )}
 
-          {/* AI PANEL */}
+          {/* AI */}
           {leftTab === "ai" && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Mode toggle */}
               <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5 shrink-0 bg-[#13131f]">
                 <button onClick={() => setAiMode("fresh")}
                   className={`flex-1 py-1 text-[10px] font-mono rounded transition-colors ${aiMode === "fresh" ? "bg-violet-500/25 text-violet-200 border border-violet-500/40" : "text-white/40 hover:text-white/60 border border-white/8"}`}>
@@ -452,15 +430,12 @@ export default function SiteBuilder() {
                 </button>
               </div>
 
-              {/* Messages */}
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 {aiMessages.map((msg, i) => (
                   <div key={i}>
                     {msg.role === "user" && (
                       <div className="flex justify-end">
-                        <div className="max-w-[90%] bg-violet-600/30 border border-violet-500/30 rounded-2xl rounded-tr-sm px-3 py-2 text-sm text-violet-100">
-                          {msg.text}
-                        </div>
+                        <div className="max-w-[90%] bg-violet-600/30 border border-violet-500/30 rounded-2xl rounded-tr-sm px-3 py-2 text-sm text-violet-100">{msg.text}</div>
                       </div>
                     )}
                     {msg.role === "ai" && (
@@ -472,7 +447,7 @@ export default function SiteBuilder() {
                           {msg.text === "__loading__" ? (
                             <div className="flex items-center gap-2 text-white/50">
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
-                              <span className="text-xs font-mono">Building your website…</span>
+                              <span className="text-xs font-mono animate-pulse">Building your website…</span>
                             </div>
                           ) : (
                             <span className="whitespace-pre-wrap">{msg.text}</span>
@@ -485,9 +460,7 @@ export default function SiteBuilder() {
                         <div className="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 mt-0.5">
                           <Sparkles className="w-3 h-3 text-violet-400" />
                         </div>
-                        <div className="flex-1 text-xs text-white/50 leading-relaxed whitespace-pre-wrap pt-1">
-                          {msg.text}
-                        </div>
+                        <div className="flex-1 text-xs text-white/50 leading-relaxed whitespace-pre-wrap pt-1">{msg.text}</div>
                       </div>
                     )}
                   </div>
@@ -495,23 +468,19 @@ export default function SiteBuilder() {
                 <div ref={chatBottomRef} />
               </div>
 
-              {/* Input */}
               <div className="p-3 border-t border-white/8 bg-[#13131f] shrink-0">
                 <div className="flex gap-2 items-end">
                   <textarea
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiSend(); } }}
-                    placeholder={aiMode === "fresh" ? "Describe the website you want…" : "What should I improve or add?"}
+                    placeholder={aiMode === "fresh" ? "Describe the website you want…" : "What should I change or add?"}
                     rows={3}
                     disabled={aiLoading}
                     className="flex-1 bg-[#252540] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/25 resize-none focus:outline-none focus:border-violet-500/60 disabled:opacity-50 leading-relaxed"
                   />
-                  <button
-                    onClick={handleAiSend}
-                    disabled={!aiInput.trim() || aiLoading}
-                    className="w-9 h-9 flex items-center justify-center bg-violet-600 hover:bg-violet-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0 mb-0.5"
-                  >
+                  <button onClick={handleAiSend} disabled={!aiInput.trim() || aiLoading}
+                    className="w-9 h-9 flex items-center justify-center bg-violet-600 hover:bg-violet-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0 mb-0.5">
                     {aiLoading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-4 h-4 text-white" />}
                   </button>
                 </div>
@@ -521,9 +490,8 @@ export default function SiteBuilder() {
           )}
         </div>
 
-        {/* FILE TABS + EDITOR */}
+        {/* EDITOR */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Tabs */}
           <div className="h-9 bg-[#252526] border-b border-white/8 flex items-end overflow-x-auto shrink-0">
             {pages?.map((file) => {
               const active = file.id === activeFileId;
@@ -541,13 +509,11 @@ export default function SiteBuilder() {
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          {/* Monaco */}
           {activeFile ? (
             <Editor height="100%" language={getLang(activeFile.slug)} value={editedContent}
               onChange={(v) => setEditedContent(v || "")} theme="vs-dark"
               options={{ minimap: { enabled: false }, fontSize: 13, tabSize: 2, wordWrap: "off", scrollBeyondLastLine: false, automaticLayout: true, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace", fontLigatures: true, cursorBlinking: "smooth", smoothScrolling: true, padding: { top: 14, bottom: 14 }, lineNumbers: "on", bracketPairColorization: { enabled: true } }}
-              onMount={(editor) => { editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: () => handleSave() }); }}
+              onMount={(editor) => { editor.addAction({ id: "save", label: "Save", keybindings: [2097], run: handleSave }); }}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-white/20 flex-col gap-3">
@@ -557,7 +523,7 @@ export default function SiteBuilder() {
           )}
         </div>
 
-        {/* LIVE PREVIEW */}
+        {/* PREVIEW */}
         <div className="w-[40%] flex flex-col border-l border-white/8 shrink-0">
           <div className="h-8 bg-[#2d2d2d] flex items-center px-3 gap-2 shrink-0 border-b border-white/5">
             <div className="flex gap-1.5">
@@ -566,10 +532,10 @@ export default function SiteBuilder() {
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/50" />
             </div>
             <div className="flex-1 mx-2 bg-[#1e1e1e] rounded text-[10px] font-mono text-white/25 px-2 py-0.5 truncate">
-              {site?.domain ? `https://${site.domain}` : "preview"}
+              {publishedUrl || "preview"}
             </div>
             <button onClick={() => { const m = (pages || []).map((p) => (p.id === activeFileId ? { ...p, content: editedContent } : p)); setPreviewDoc(buildPreview(m as FileItem[])); setPreviewKey((k) => k + 1); }}
-              className="text-white/25 hover:text-white/60 transition-colors">
+              className="text-white/25 hover:text-white/60 transition-colors" title="Refresh preview">
               <RefreshCw className="w-3 h-3" />
             </button>
           </div>
@@ -586,34 +552,37 @@ export default function SiteBuilder() {
         <span>Ctrl+S to save</span>
       </div>
 
-      {/* LAUNCH DIALOG */}
-      <Dialog open={launchOpen} onOpenChange={setLaunchOpen}>
-        <DialogContent className="sm:max-w-md bg-[#252526] border-white/10 rounded-none text-white">
-          <DialogHeader><DialogTitle className="font-mono text-base flex items-center gap-2"><Play className="w-4 h-4 text-primary fill-current" /> Launch Site</DialogTitle></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-white/50">Enter the domain you've pointed to this server.</p>
-            <div>
-              <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-2 block">Domain</label>
-              <Input value={launchDomain} onChange={(e) => setLaunchDomain(e.target.value)} placeholder="www.example.com" className="bg-[#1e1e1e] border-white/10 rounded-none font-mono text-white h-10" />
+      {/* PUBLISH SUCCESS DIALOG */}
+      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <DialogContent className="sm:max-w-md bg-[#1a1a2e] border-violet-500/30 rounded-xl text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-mono">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              Site is Live!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-sm text-white/60">Your website is publicly accessible at:</p>
+            <div className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg px-3 py-2.5">
+              <Globe className="w-4 h-4 text-violet-400 shrink-0" />
+              <span className="flex-1 text-sm font-mono text-violet-200 truncate">{publishedUrl}</span>
+              <button onClick={() => { if (publishedUrl) { navigator.clipboard.writeText(publishedUrl); toast({ title: "Copied!" }); } }}
+                className="text-white/40 hover:text-white transition-colors shrink-0">
+                <Copy className="w-4 h-4" />
+              </button>
             </div>
-            {launchDomain.trim() && (
-              <div className="border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-amber-400 text-[10px] font-mono mb-3"><AlertTriangle className="w-3.5 h-3.5" /> DNS RECORDS NEEDED</div>
-                {[{ type: "A", name: "@", value: "76.76.21.21" }, { type: "CNAME", name: "www", value: "cname.vercel-dns.com" }].map((r, i) => (
-                  <div key={i} className="flex items-center gap-3 text-[11px] font-mono">
-                    <span className="text-white/30 w-12">{r.type}</span>
-                    <span className="text-white/50 w-10">{r.name}</span>
-                    <span className="text-primary flex-1">{r.value}</span>
-                    <button onClick={() => { navigator.clipboard.writeText(r.value); toast({ title: "Copied" }); }} className="text-white/30 hover:text-white"><Copy className="w-3 h-3" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setLaunchOpen(false)} className="flex-1 border-white/10 text-white rounded-none font-mono text-xs">Cancel</Button>
-              <Button onClick={handleLaunch} disabled={!launchDomain.trim() || launchSite.isPending} className="flex-1 bg-primary text-[#0a0a10] hover:bg-primary/90 rounded-none font-mono text-xs font-bold">
-                {launchSite.isPending ? "Launching…" : "Launch"}
+              <Button variant="outline" onClick={() => setPublishOpen(false)} className="flex-1 border-white/10 text-white/70 hover:text-white rounded-lg font-mono text-xs">
+                Close
               </Button>
+              <Button onClick={() => window.open(publishedUrl!, "_blank")}
+                className="flex-1 bg-violet-600 hover:bg-violet-500 text-white rounded-lg font-mono text-xs">
+                <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Site
+              </Button>
+            </div>
+            <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 text-xs text-amber-200/70 leading-relaxed">
+              <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5 text-amber-400" />
+              This URL is hosted by Replit and is always live. To use a custom domain like <span className="font-mono">www.yoursite.com</span>, point your domain's DNS to this URL or use a service like Cloudflare to proxy it.
             </div>
           </div>
         </DialogContent>
@@ -635,7 +604,10 @@ function SiteSettingsDialog({ open, onClose, site, updateSite, queryClient }: an
       <DialogContent className="sm:max-w-sm bg-[#252526] border-white/10 rounded-none text-white">
         <DialogHeader><DialogTitle className="font-mono text-sm flex items-center gap-2"><Settings className="w-4 h-4" /> Site Settings</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
-          {[{ label: "Domain", value: domain, set: setDomain, placeholder: "www.example.com" }, { label: "Client Email", value: clientEmail, set: setClientEmail, placeholder: "client@company.com" }].map(({ label, value, set, placeholder }) => (
+          {[
+            { label: "Domain / URL", value: domain, set: setDomain, placeholder: "www.example.com" },
+            { label: "Client Email", value: clientEmail, set: setClientEmail, placeholder: "client@company.com" },
+          ].map(({ label, value, set, placeholder }) => (
             <div key={label}>
               <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5 block">{label}</label>
               <Input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="bg-[#1e1e1e] border-white/10 rounded-none font-mono text-white h-9 text-sm" />
@@ -644,7 +616,7 @@ function SiteSettingsDialog({ open, onClose, site, updateSite, queryClient }: an
           <div>
             <label className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5 block">Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 text-white text-sm h-9 px-3 font-mono rounded-none focus:outline-none">
-              {["draft", "building", "review", "paused", ...(site.status === "live" ? ["live"] : [])].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              {["draft", "building", "review", "paused", "live"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
           </div>
           <div className="flex gap-3 pt-2">
