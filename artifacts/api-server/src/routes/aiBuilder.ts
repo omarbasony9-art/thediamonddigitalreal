@@ -143,6 +143,40 @@ CODE:
 - Images: use div.img-placeholder with CSS gradient + aspect-ratio
 - Mobile-first, breakpoints at 768px and 1200px
 
+TEXT OVERFLOW — NEVER CUT OFF TEXT (NON-NEGOTIABLE):
+Text must NEVER be clipped, hidden, or cut off anywhere on any screen size. This is a critical quality rule.
+
+ALWAYS include in your global CSS reset:
+*, *::before, *::after { box-sizing: border-box; }
+body { overflow-x: hidden; }
+img, video { max-width: 100%; height: auto; }
+
+For ALL text containers:
+- overflow: visible (never overflow: hidden on any element that contains text unless it's a deliberate scroll container)
+- word-wrap: break-word;
+- overflow-wrap: break-word;
+- min-width: 0; (on flex/grid children to prevent overflow)
+
+For headings that use large vw-based font sizes:
+- Use clamp() so they never get too big: font-size: clamp(2rem, 8vw, 6rem)
+- Never use a raw vw value like font-size: 12vw without a clamp() min/max
+- white-space: normal (never nowrap unless you've guaranteed enough space)
+
+For navigation items:
+- Never let nav overflow — use flex-wrap: wrap or the hamburger menu at narrow widths
+- Nav items must never be clipped by overflow: hidden on the nav container
+
+For cards and grid items:
+- Always set min-width: 0 on flex/grid children
+- Use word-break: break-word on card text
+- Ensure card padding leaves enough room — padding: 1.5rem minimum
+
+NEVER DO THIS:
+- font-size: 15vw (without clamp)
+- overflow: hidden on a section/div that wraps text
+- white-space: nowrap on a heading or nav item without guaranteed space
+- Fixed pixel widths on text containers without max-width: 100%
+
 RESPONSIVE DESIGN — NON-NEGOTIABLE:
 Every site MUST look polished on a 375px phone AND a 1440px desktop. This is not optional.
 
