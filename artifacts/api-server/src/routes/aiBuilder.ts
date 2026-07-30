@@ -142,6 +142,8 @@ CODE:
 - All JS in script.js, pure vanilla, wrapped in DOMContentLoaded
 - Images: use div.img-placeholder with CSS gradient + aspect-ratio
 - Mobile-first, breakpoints at 768px and 1200px
+- EVERY HTML file must include this exact favicon line in <head>:
+  <link rel="icon" type="image/png" href="https://thediamonddigital.com/favicon.png">
 
 TEXT OVERFLOW — NEVER CUT OFF TEXT (NON-NEGOTIABLE):
 Text must NEVER be clipped, hidden, or cut off anywhere on any screen size. This is a critical quality rule.
@@ -300,7 +302,8 @@ One sentence about what you're building.
 [complete single-file spreadsheet with embedded CSS and JS — everything self-contained]
 <<<END>>>
 
-Always output as index.html. All CSS and JS embedded in the HTML file. No external dependencies except Google Fonts.`;
+Always output as index.html. All CSS and JS embedded in the HTML file. No external dependencies except Google Fonts.
+Always include this favicon in <head>: <link rel="icon" type="image/png" href="https://thediamonddigital.com/favicon.png">`;
 
 const APPLICATION_PROMPT = `You are Diamond — a senior full-stack product engineer and UX designer at Diamond Digital. You build real interactive web applications: dashboards, tools, forms, admin panels, CRMs, booking systems, calculators, quiz apps, game boards — anything that does something.
 
@@ -355,6 +358,7 @@ DESIGN RULES:
 - Game/quiz apps: high energy, animation, reward moments
 
 NEVER build a static mockup. Every button must do something.
+Always include this favicon in every HTML file's <head>: <link rel="icon" type="image/png" href="https://thediamonddigital.com/favicon.png">
 
 ════════════════════════════════════════
 OUTPUT FORMAT
