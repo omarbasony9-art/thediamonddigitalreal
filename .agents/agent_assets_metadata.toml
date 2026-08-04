@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "180pNawuX4U-dI_fyH3G8"
+uri = "file://diamond-digital-website.zip"
+type = "unspecified"
+title = "Diamond Digital Website"
+description = "Complete source code — all pages, components, styles, and public assets."
