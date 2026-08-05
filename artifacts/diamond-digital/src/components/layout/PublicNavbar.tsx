@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Shield, User } from "lucide-react";
+import { Menu, X, Shield } from "lucide-react";
 import { useState } from "react";
 
 function isAdminLoggedIn() {
@@ -49,13 +49,6 @@ export function PublicNavbar() {
               </span>
             </Link>
           ))}
-          <Link href="/client-login" className="ml-1">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white hover:bg-white/5 font-mono text-xs tracking-widest gap-1.5 rounded-none border border-white/10 h-9 px-3 lg:px-4">
-              <User className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">CLIENT PORTAL</span>
-              <span className="lg:hidden">PORTAL</span>
-            </Button>
-          </Link>
           <Link href={adminLoggedIn ? "/admin" : "/admin/login"}>
             <Button variant="outline" size="sm" className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-mono text-xs tracking-widest gap-1.5 h-9 rounded-none px-3 lg:px-4">
               <Shield className="w-3.5 h-3.5" />
@@ -93,11 +86,6 @@ export function PublicNavbar() {
                 </Link>
               ))}
               <div className="pt-3 mt-2 border-t border-white/10 flex flex-col gap-2.5">
-                <Link href="/client-login" onClick={() => setIsOpen(false)}>
-                  <Button variant="outline" className="w-full border-white/20 text-white font-mono text-sm gap-2 rounded-none h-11">
-                    <User className="w-4 h-4" /> CLIENT PORTAL
-                  </Button>
-                </Link>
                 <Link href={adminLoggedIn ? "/admin" : "/admin/login"} onClick={() => setIsOpen(false)}>
                   <Button className="w-full bg-primary text-primary-foreground font-mono text-sm gap-2 rounded-none h-11">
                     <Shield className="w-4 h-4" /> {adminLoggedIn ? "ADMIN CONSOLE" : "ADMIN"}

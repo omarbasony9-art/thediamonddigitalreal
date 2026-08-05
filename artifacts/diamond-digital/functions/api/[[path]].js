@@ -593,42 +593,6 @@ export async function onRequest(context) {
       return new Response(page.content, { headers: { "Content-Type": MIME[ext] || "text/plain", "Cache-Control": "public, max-age=60" } });
     }
 
-    // ── Client Auth ───────────────────────────────────────────────────────────
-    if (path === "/client/register" && method === "POST") {
-      const { name, email, password, company } = body;
-      if (!name || !email || !password) return err("Name, email, and password are required");
-      if (password.length < 8) return err("Password must be at least 8 characters");
-      const existing = await DB.prepare("SELECT id FROM client_users WHERE email = ?").bind(email.toLowerCase()).first();
-      if (existing) return err("An account with that email already exists.", 409);
-      const hash = await hashPassword(password);
-      const user = cam(await DB.prepare("INSERT INTO client_users (name, email, password_hash, company, created_at) VALUES (?, ?, ?, ?, ?) RETURNING *")
-        .bind(name, email.toLowerCase(), hash, company || null, now()).first());
-      const token = await signJWT({ clientId: user.id, email: user.email }, JWT_SECRET);
-      return json({ token, user: { id: user.id, name: user.name, email: user.email, company: user.company } }, 201);
-    }
-
-    if (path === "/client/login" && method === "POST") {
-      const { email, password } = body;
-      if (!email || !password) return err("Email and password are required");
-      const user = cam(await DB.prepare("SELECT * FROM client_users WHERE email = ?").bind(email.toLowerCase()).first());
-      if (!user) return err("Invalid email or password.", 401);
-      const valid = await verifyPassword(password, user.passwordHash);
-      if (!valid) return err("Invalid email or password.", 401);
-      const token = await signJWT({ clientId: user.id, email: user.email }, JWT_SECRET);
-      return json({ token, user: { id: user.id, name: user.name, email: user.email, company: user.company } });
-    }
-
-    if (path === "/client/me" && method === "GET") {
-      const auth = request.headers.get("authorization") || "";
-      if (!auth.startsWith("Bearer ")) return err("Unauthorized", 401);
-      let payload;
-      try { payload = await verifyJWT(auth.slice(7), JWT_SECRET); } catch { return err("Invalid or expired token", 401); }
-      const user = cam(await DB.prepare("SELECT * FROM client_users WHERE id = ?").bind(payload.clientId).first());
-      if (!user) return err("User not found", 401);
-      const sites = camAll((await DB.prepare("SELECT * FROM sites WHERE client_email = ?").bind(user.email).all()).results);
-      return json({ id: user.id, name: user.name, email: user.email, company: user.company, sites });
-    }
-
     // ── AI Builder ────────────────────────────────────────────────────────────
     if (path === "/admin/ai/generate" && method === "POST") {
       const payload = await adminAuth(request, env);

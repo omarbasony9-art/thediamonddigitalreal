@@ -7,8 +7,6 @@ import Home from "./pages/Home";
 import Services from "./pages/Services";
 import Industries from "./pages/Industries";
 import About from "./pages/About";
-import ClientLogin from "./pages/ClientLogin";
-import ClientPortal from "./pages/ClientPortal";
 import Dashboard from "./pages/admin/Dashboard";
 import QuotesList from "./pages/admin/QuotesList";
 import SitesList from "./pages/admin/SitesList";
@@ -52,10 +50,6 @@ function AppRoutes() {
           <Route path="/admin/sites/:id">
             <ProtectedAdminRoute><SiteBuilder /></ProtectedAdminRoute>
           </Route>
-
-          {/* Client Portal */}
-          <Route path="/client-login" component={ClientLogin} />
-          <Route path="/client-portal" component={ClientPortal} />
 
           {/* Public */}
           <Route path="/">
