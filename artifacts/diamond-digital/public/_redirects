@@ -1,0 +1,3 @@
+# Cloudflare Pages routing rules
+# Functions always take priority for /api/* — this is the SPA fallback for everything else
+/* /index.html 200
