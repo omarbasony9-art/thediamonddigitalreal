@@ -12,5 +12,5 @@ description = "Complete source code — all pages, components, styles, and publi
 id = "dTdCML-wFpWsudLOACYvf"
 uri = "file://cloudflare-diamond-digital.zip"
 type = "unspecified"
-title = "Diamond Digital — Cloudflare Package"
-description = "One upload to Cloudflare Pages. Includes the full website + admin API + AI builder. Follow the README inside to set up your D1 database and create your admin account."
+title = "Diamond Digital — Cloudflare Package (fixed login)"
+description = "Clerk removed. Admin login now posts directly to /api/admin/auth/login via your custom JWT system. All other routes unchanged."
