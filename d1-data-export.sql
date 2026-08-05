@@ -14,7 +14,6 @@
 --   Cloudflare Dashboard → Workers & Pages → D1 → diamond-digital → Console
 --   Paste the full contents of this file and click Execute.
 
-BEGIN;
 
 
 -- ── sites (6 rows) ──────────────────────────────────────────
@@ -1385,4 +1384,3 @@ INSERT INTO activity_log ("id", "type", "message", "entity_id", "entity_type", "
 -- ── client_users (1 rows) ───────────────────────────────────
 INSERT INTO client_users ("id", "name", "email", "password_hash", "company", "created_at") VALUES (1, 'The Titan Media', 'contact@thetitanmedia.com', '$2b$12$SmK7yRjh3.2T3rbDkDXAM.hHt4THnjddNmYVFiWto6HgJYXwTdUXe', 'The Titan Media', '2026-07-22T10:30:21.857Z');
 
-COMMIT;
