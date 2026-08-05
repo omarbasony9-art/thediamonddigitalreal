@@ -286,17 +286,17 @@ export async function onRequest(context) {
 
   try {
 
-    // ── CANARY — remove once function is confirmed reachable ─────────────────
-    if (path === "/admin/auth/login" && method === "POST") {
-      return new Response(JSON.stringify({ success: false, message: "Cloudflare function reached" }), {
-        status: 418,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      });
-    }
-
     // ── Health ──────────────────────────────────────────────────────────────
     if (path === "/healthz" && method === "GET") {
-      return json({ status: "ok" });
+      return json({ status: "ok", db: !!DB });
+    }
+
+    // Fail fast with a clear message if the D1 binding is missing
+    if (!DB) {
+      return err(
+        "D1 database not bound. Go to Cloudflare Pages → Settings → Bindings and add a D1 binding named DB.",
+        503
+      );
     }
 
     // ── First-Run Setup (only works when no admins exist) ───────────────────
@@ -317,10 +317,32 @@ export async function onRequest(context) {
     if (path === "/admin/auth/login" && method === "POST") {
       const { username, password } = body;
       if (!username || !password) return err("Username and password required");
+
       const user = await DB.prepare("SELECT * FROM admin_users WHERE username = ?").bind(username).first();
-      if (!user) return err("Invalid credentials", 401);
+      if (!user) {
+        // Check whether the table is completely empty so we give a more actionable message
+        const count = await DB.prepare("SELECT COUNT(*) as n FROM admin_users").first();
+        if (count.n === 0) {
+          return err(
+            "No admin account exists yet. POST to /api/admin/setup with {username, password} to create one.",
+            401
+          );
+        }
+        return err(`No admin account found with username "${username}".`, 401);
+      }
+
+      if (!user.password_hash?.startsWith("pbkdf2:")) {
+        return err(
+          "Password hash format is incompatible (stored hash is not PBKDF2). " +
+          "The admin account was likely migrated from the old server. " +
+          "DELETE the row from admin_users in D1 and POST to /api/admin/setup to re-create it.",
+          401
+        );
+      }
+
       const valid = await verifyPassword(password, user.password_hash);
-      if (!valid) return err("Invalid credentials", 401);
+      if (!valid) return err("Incorrect password.", 401);
+
       const token = await signJWT({ adminId: user.id, username: user.username }, JWT_SECRET);
       return json({ token, username: user.username });
     }
