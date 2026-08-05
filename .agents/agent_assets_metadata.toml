@@ -12,5 +12,5 @@ description = "Complete source code — all pages, components, styles, and publi
 id = "dTdCML-wFpWsudLOACYvf"
 uri = "file://cloudflare-diamond-digital.zip"
 type = "unspecified"
-title = "Diamond Digital — Cloudflare Package (fixed login)"
-description = "Clerk removed. Admin login now posts directly to /api/admin/auth/login via your custom JWT system. All other routes unchanged."
+title = "Diamond Digital — Cloudflare Package (functions at root)"
+description = "functions/api/[[path]].js is now at the zip root alongside index.html. Deploy by uploading this zip to Cloudflare Pages → Create → Upload assets."
