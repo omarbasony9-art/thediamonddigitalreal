@@ -21,7 +21,7 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["nano"]
+packages = ["nano", "dig"]
 
 [objectStorage]
 defaultBucketID = "replit-objstore-b02e958d-03f7-480f-9f5c-cc0ed40e4ca6"
