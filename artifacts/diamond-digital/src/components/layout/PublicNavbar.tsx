@@ -47,7 +47,6 @@ export function PublicNavbar() {
 
   const links = [
     { href: "/", label: "Home" },
-    { href: "/industries", label: "Industries" },
   ];
 
   const servicesActive = location === "/services" || location === "/digital-marketing";
@@ -83,46 +82,6 @@ export function PublicNavbar() {
             </Link>
           ))}
 
-          {/* About dropdown */}
-          <div
-            ref={aboutRef}
-            className="relative"
-            onMouseEnter={() => setAboutOpen(true)}
-            onMouseLeave={() => setAboutOpen(false)}
-          >
-            <button
-              className={`flex items-center gap-1 text-sm tracking-wide transition-colors hover:text-primary ${aboutActive ? "text-primary glow-text" : "text-muted-foreground"}`}
-              onClick={() => setAboutOpen((v) => !v)}
-              aria-expanded={aboutOpen}
-            >
-              About
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${aboutOpen ? "rotate-180" : ""}`} />
-            </button>
-
-            <AnimatePresence>
-              {aboutOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute top-full left-0 mt-3 w-56 bg-card border border-white/10 py-1 z-50 shadow-xl"
-                >
-                  <Link href="/about/digital-marketing" onClick={() => setAboutOpen(false)}>
-                    <span className={`flex items-center px-5 py-3 text-sm tracking-wide transition-colors hover:text-primary hover:bg-primary/5 ${location === "/about/digital-marketing" ? "text-primary" : "text-muted-foreground"}`}>
-                      Digital Marketing
-                    </span>
-                  </Link>
-                  <Link href="/about/software-development" onClick={() => setAboutOpen(false)}>
-                    <span className={`flex items-center px-5 py-3 text-sm tracking-wide transition-colors hover:text-primary hover:bg-primary/5 ${location === "/about/software-development" ? "text-primary" : "text-muted-foreground"}`}>
-                      Software Development
-                    </span>
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
           {/* Services dropdown */}
           <div
             ref={servicesRef}
@@ -155,6 +114,53 @@ export function PublicNavbar() {
                   </Link>
                   <Link href="/services" onClick={() => setServicesOpen(false)}>
                     <span className={`flex items-center px-5 py-3 text-sm tracking-wide transition-colors hover:text-primary hover:bg-primary/5 ${location === "/services" ? "text-primary" : "text-muted-foreground"}`}>
+                      Software Development
+                    </span>
+                  </Link>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Industries */}
+          <Link href="/industries">
+            <span className={`text-sm tracking-wide transition-colors hover:text-primary ${location === "/industries" ? "text-primary glow-text" : "text-muted-foreground"}`}>
+              Industries
+            </span>
+          </Link>
+
+          {/* About dropdown */}
+          <div
+            ref={aboutRef}
+            className="relative"
+            onMouseEnter={() => setAboutOpen(true)}
+            onMouseLeave={() => setAboutOpen(false)}
+          >
+            <button
+              className={`flex items-center gap-1 text-sm tracking-wide transition-colors hover:text-primary ${aboutActive ? "text-primary glow-text" : "text-muted-foreground"}`}
+              onClick={() => setAboutOpen((v) => !v)}
+              aria-expanded={aboutOpen}
+            >
+              About
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${aboutOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            <AnimatePresence>
+              {aboutOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full left-0 mt-3 w-56 bg-card border border-white/10 py-1 z-50 shadow-xl"
+                >
+                  <Link href="/about/digital-marketing" onClick={() => setAboutOpen(false)}>
+                    <span className={`flex items-center px-5 py-3 text-sm tracking-wide transition-colors hover:text-primary hover:bg-primary/5 ${location === "/about/digital-marketing" ? "text-primary" : "text-muted-foreground"}`}>
+                      Digital Marketing
+                    </span>
+                  </Link>
+                  <Link href="/about/software-development" onClick={() => setAboutOpen(false)}>
+                    <span className={`flex items-center px-5 py-3 text-sm tracking-wide transition-colors hover:text-primary hover:bg-primary/5 ${location === "/about/software-development" ? "text-primary" : "text-muted-foreground"}`}>
                       Software Development
                     </span>
                   </Link>
@@ -200,39 +206,6 @@ export function PublicNavbar() {
                 </Link>
               ))}
 
-              {/* Mobile About accordion */}
-              <div>
-                <button
-                  className={`flex items-center justify-between w-full py-3 px-3 text-base tracking-wide rounded-md transition-colors ${aboutActive ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}
-                  onClick={() => setMobileAboutOpen((v) => !v)}
-                >
-                  About
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileAboutOpen ? "rotate-180" : ""}`} />
-                </button>
-                <AnimatePresence>
-                  {mobileAboutOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="ml-3 border-l border-white/10 overflow-hidden"
-                    >
-                      <Link href="/about/digital-marketing" onClick={() => { setIsOpen(false); setMobileAboutOpen(false); }}>
-                        <span className={`flex py-2.5 px-4 text-sm tracking-wide transition-colors ${location === "/about/digital-marketing" ? "text-primary" : "text-muted-foreground hover:text-white"}`}>
-                          Digital Marketing
-                        </span>
-                      </Link>
-                      <Link href="/about/software-development" onClick={() => { setIsOpen(false); setMobileAboutOpen(false); }}>
-                        <span className={`flex py-2.5 px-4 text-sm tracking-wide transition-colors ${location === "/about/software-development" ? "text-primary" : "text-muted-foreground hover:text-white"}`}>
-                          Software Development
-                        </span>
-                      </Link>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
               {/* Mobile Services accordion */}
               <div>
                 <button
@@ -258,6 +231,46 @@ export function PublicNavbar() {
                       </Link>
                       <Link href="/services" onClick={() => { setIsOpen(false); setMobileServicesOpen(false); }}>
                         <span className={`flex py-2.5 px-4 text-sm tracking-wide transition-colors ${location === "/services" ? "text-primary" : "text-muted-foreground hover:text-white"}`}>
+                          Software Development
+                        </span>
+                      </Link>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Industries */}
+              <Link href="/industries" onClick={() => setIsOpen(false)}>
+                <span className={`flex items-center py-3 px-3 text-base tracking-wide rounded-md transition-colors ${location === "/industries" ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}>
+                  Industries
+                </span>
+              </Link>
+
+              {/* Mobile About accordion */}
+              <div>
+                <button
+                  className={`flex items-center justify-between w-full py-3 px-3 text-base tracking-wide rounded-md transition-colors ${aboutActive ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}
+                  onClick={() => setMobileAboutOpen((v) => !v)}
+                >
+                  About
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileAboutOpen ? "rotate-180" : ""}`} />
+                </button>
+                <AnimatePresence>
+                  {mobileAboutOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="ml-3 border-l border-white/10 overflow-hidden"
+                    >
+                      <Link href="/about/digital-marketing" onClick={() => { setIsOpen(false); setMobileAboutOpen(false); }}>
+                        <span className={`flex py-2.5 px-4 text-sm tracking-wide transition-colors ${location === "/about/digital-marketing" ? "text-primary" : "text-muted-foreground hover:text-white"}`}>
+                          Digital Marketing
+                        </span>
+                      </Link>
+                      <Link href="/about/software-development" onClick={() => { setIsOpen(false); setMobileAboutOpen(false); }}>
+                        <span className={`flex py-2.5 px-4 text-sm tracking-wide transition-colors ${location === "/about/software-development" ? "text-primary" : "text-muted-foreground hover:text-white"}`}>
                           Software Development
                         </span>
                       </Link>
