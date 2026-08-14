@@ -71,7 +71,7 @@ const processSteps = [
 export default function Home() {
   useSeo({
     title: "Diamond Digital | Digital Marketing & Software Development",
-    description: "Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses.",
+    description: "Diamond Digital provides digital marketing and software development services to help businesses grow, build, and scale.",
     canonical: "/",
   });
   const { toast } = useToast();
