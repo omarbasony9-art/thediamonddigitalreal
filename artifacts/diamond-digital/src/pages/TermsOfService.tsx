@@ -1,6 +1,12 @@
 import { motion } from "framer-motion";
+import { useSeo } from "@/hooks/useSeo";
 
 export default function TermsOfService() {
+  useSeo({
+    title: "Terms of Service | Diamond Digital",
+    description: "Review Diamond Digital's terms of service governing website use, digital marketing services, software development projects, and client agreements.",
+    canonical: "/terms-of-service",
+  });
   return (
     <div className="pt-[60px] pb-32 px-6">
       <div className="container mx-auto max-w-3xl">

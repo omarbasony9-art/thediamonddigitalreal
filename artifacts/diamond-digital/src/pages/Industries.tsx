@@ -3,6 +3,7 @@ import {
   Heart, ShoppingCart, Building2, BarChart2, Cpu, GraduationCap,
   Plane, Car, Store, UtensilsCrossed, Shirt, Factory, Film, Users, Scale
 } from "lucide-react";
+import { useSeo } from "@/hooks/useSeo";
 
 const industries = [
   {
@@ -143,6 +144,11 @@ const industries = [
 ];
 
 export default function Industries() {
+  useSeo({
+    title: "Industries We Serve | Diamond Digital",
+    description: "Diamond Digital delivers digital marketing and software development to businesses across healthcare, e-commerce, real estate, finance, hospitality, education, and more.",
+    canonical: "/industries",
+  });
   return (
     <div className="pt-24 pb-32 px-6">
       <div className="container mx-auto">

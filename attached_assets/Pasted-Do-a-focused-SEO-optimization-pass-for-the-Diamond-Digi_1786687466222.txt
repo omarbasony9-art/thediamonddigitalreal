@@ -1,0 +1,81 @@
+Do a focused SEO optimization pass for the Diamond Digital website.
+Goal: improve on-page SEO, technical SEO, page titles, metadata, crawlability, and search appearance without redesigning the site or changing working functionality.
+IMPORTANT:
+Do not redesign anything
+Do not change backend, database, auth, admin, routing behavior, or working features
+Do not add unnecessary dependencies
+Do not change URLs unless required for SEO
+Keep agent usage low and inspect only frontend routing, page components, head/meta setup, and public SEO files
+Optimize these pages:
+Home
+Digital Marketing
+Software Development
+Industries
+About Digital Marketing
+About Software Development
+Privacy Policy
+Terms of Service
+For every major page:
+Add a unique <title>
+Add a unique meta description
+Add canonical URL
+Add Open Graph title, description, URL, and type
+Add Twitter Card metadata
+Make sure there is only one clear H1 per page
+Keep heading hierarchy logical: H1 → H2 → H3
+Add descriptive alt text to meaningful images
+Make internal links descriptive and useful
+Use Diamond Digital’s positioning consistently:
+Digital Marketing & Software Development
+Main company description:
+Diamond Digital helps businesses grow through digital marketing, paid media, social strategy, content, lead generation, websites, web applications, mobile applications, and custom software development.
+Company relationship:
+Diamond Digital is a subsidiary of The Titan Media.
+Suggested Home title:
+Diamond Digital | Digital Marketing & Software Development
+Suggested Home meta description:
+Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses.
+Suggested Digital Marketing title:
+Digital Marketing Services | Diamond Digital
+Suggested Digital Marketing meta description:
+Grow your business with paid advertising, social media management, SEO, content creation, influencer marketing, email marketing, lead generation, and analytics from Diamond Digital.
+Suggested Software Development title:
+Software Development Services | Diamond Digital
+Suggested Software Development meta description:
+Diamond Digital builds websites, web applications, mobile apps, dashboards, internal tools, automations, integrations, and custom software for businesses.
+Add structured data where appropriate using JSON-LD:
+Organization
+WebSite
+Service data for Digital Marketing
+Service data for Software Development
+Organization schema should include:
+name: Diamond Digital
+parentOrganization: The Titan Media
+url: use the production Diamond Digital domain
+sameAs only if real social profile URLs already exist in the project
+Technical SEO:
+Create or update robots.txt
+Create or update sitemap.xml
+Include all public important routes
+Exclude admin/private routes from indexing
+Ensure /privacy-policy and /terms-of-service are included
+Do not include /admin, console/admin-only routes, or private dashboard routes in sitemap
+Make sure robots does not accidentally block the public site
+Also check:
+page language attribute
+mobile viewport
+favicon/site icon references
+semantic HTML where easy to improve without redesign
+duplicate page titles/descriptions
+missing meta descriptions
+broken internal links
+image alt attributes
+crawlable navigation links
+Do not keyword-stuff.
+Keep copy natural and professional.
+Do not add fake locations, fake reviews, fake statistics, or fake business information.
+After making changes:
+run the frontend build
+report exactly which files changed
+list the final SEO title and meta description for each optimized page
+report any SEO items that require my manual action, such as Google Search Console or adding the live domain

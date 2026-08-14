@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateQuote } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useSeo } from "@/hooks/useSeo";
+import { JsonLd } from "@/components/JsonLd";
 
 const quoteSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -105,6 +107,11 @@ const processSteps = [
 ];
 
 export default function DigitalMarketing() {
+  useSeo({
+    title: "Digital Marketing Services | Diamond Digital",
+    description: "Grow your business with paid advertising, social media management, SEO, content creation, influencer marketing, email marketing, lead generation, and analytics from Diamond Digital.",
+    canonical: "/digital-marketing",
+  });
   const { toast } = useToast();
   const createQuote = useCreateQuote();
 
@@ -129,6 +136,16 @@ export default function DigitalMarketing() {
   };
 
   return (
+    <>
+    <JsonLd data={{
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "serviceType": "Digital Marketing",
+      "provider": { "@id": "https://thediamonddigital.com/#organization" },
+      "name": "Digital Marketing Services",
+      "description": "Paid advertising, social media management, SEO, content creation, influencer marketing, email marketing, lead generation, and analytics.",
+      "url": "https://thediamonddigital.com/digital-marketing"
+    }} />
     <div className="flex flex-col">
 
       {/* ── SERVICES GRID ── */}
@@ -140,7 +157,7 @@ export default function DigitalMarketing() {
             viewport={{ once: true }}
             className="max-w-3xl mb-16"
           >
-            <h2 className="text-5xl md:text-6xl font-display font-black text-white mb-6">OUR EXPERTISE</h2>
+            <h1 className="text-5xl md:text-6xl font-display font-black text-white mb-6">OUR EXPERTISE</h1>
             <p className="text-xl text-muted-foreground leading-relaxed">
               From paid media and social strategy to SEO, content, and analytics — Diamond Digital covers every channel of growth.
             </p>
@@ -337,5 +354,6 @@ export default function DigitalMarketing() {
         </div>
       </section>
     </div>
+    </>
   );
 }

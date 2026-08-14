@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Megaphone, Share2, FileText, Users, Mail, Target, TrendingUp, LineChart, Palette } from "lucide-react";
+import { useSeo } from "@/hooks/useSeo";
 
 const capabilities = [
   {
@@ -61,6 +62,11 @@ const capabilities = [
 ];
 
 export default function AboutDigitalMarketing() {
+  useSeo({
+    title: "About Our Digital Marketing Practice | Diamond Digital",
+    description: "Learn how Diamond Digital's digital marketing team drives measurable growth through paid media, SEO, social strategy, content, and analytics.",
+    canonical: "/about/digital-marketing",
+  });
   return (
     <div className="pt-[60px] pb-32 px-6">
       <div className="container mx-auto">

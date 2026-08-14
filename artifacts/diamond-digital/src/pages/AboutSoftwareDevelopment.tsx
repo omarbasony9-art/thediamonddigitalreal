@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Globe, MonitorSmartphone, Smartphone, Code2, LayoutDashboard, BarChart3, Plug, Zap, Server } from "lucide-react";
+import { useSeo } from "@/hooks/useSeo";
 
 const capabilities = [
   {
@@ -61,6 +62,11 @@ const capabilities = [
 ];
 
 export default function AboutSoftwareDevelopment() {
+  useSeo({
+    title: "About Our Software Development Practice | Diamond Digital",
+    description: "Diamond Digital engineers custom websites, web apps, mobile apps, and software solutions built around specific business needs — no templates, no shortcuts.",
+    canonical: "/about/software-development",
+  });
   return (
     <div className="pt-[60px] pb-32 px-6">
       <div className="container mx-auto">

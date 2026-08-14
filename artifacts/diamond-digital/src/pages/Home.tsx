@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateQuote } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useSeo } from "@/hooks/useSeo";
+import { JsonLd } from "@/components/JsonLd";
 
 const quoteSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -67,6 +69,11 @@ const processSteps = [
 ];
 
 export default function Home() {
+  useSeo({
+    title: "Diamond Digital | Digital Marketing & Software Development",
+    description: "Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses.",
+    canonical: "/",
+  });
   const { toast } = useToast();
   const createQuote = useCreateQuote();
 
@@ -111,14 +118,15 @@ export default function Home() {
           >
             MARKETING THAT GROWS.
           </motion.h1>
-          <motion.h1
+          <motion.p
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.25 }}
             className="text-[2.4rem] xs:text-5xl md:text-7xl lg:text-[88px] font-display font-black leading-[1.05] mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary glow-text"
+            aria-hidden="true"
           >
             SOFTWARE THAT SCALES.
-          </motion.h1>
+          </motion.p>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}

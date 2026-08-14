@@ -3,20 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Diamond Digital</title>
-    <meta name="description" content="Diamond Digital — custom software, web platforms, and digital products built sharp by design." />
+    <title>Diamond Digital | Digital Marketing &amp; Software Development</title>
+    <meta name="description" content="Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="Diamond Digital" />
-    <meta property="og:description" content="Diamond Digital — custom software, web platforms, and digital products built sharp by design." />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="Diamond Digital" />
+    <meta property="og:title" content="Diamond Digital | Digital Marketing &amp; Software Development" />
+    <meta property="og:description" content="Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses." />
+    <meta property="og:url" content="https://thediamonddigital.com/" />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://thediamonddigital.com/favicon.png" />
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Diamond Digital" />
-    <meta name="twitter:description" content="Diamond Digital — custom software, web platforms, and digital products built sharp by design." />
+    <meta name="twitter:title" content="Diamond Digital | Digital Marketing &amp; Software Development" />
+    <meta name="twitter:description" content="Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses." />
+    <meta name="twitter:image" content="https://thediamonddigital.com/favicon.png" />
+
+    <!-- Canonical (homepage default; overridden per-page via useSeo hook) -->
+    <link rel="canonical" href="https://thediamonddigital.com/" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.png" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Structured Data: Organization + WebSite (site-wide) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://thediamonddigital.com/#organization",
+          "name": "Diamond Digital",
+          "url": "https://thediamonddigital.com",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://thediamonddigital.com/logo.svg"
+          },
+          "description": "Diamond Digital provides digital marketing, paid advertising, social media, lead generation, web development, mobile apps, and custom software solutions for growing businesses.",
+          "email": "info@thediamonddigital.com",
+          "parentOrganization": {
+            "@type": "Organization",
+            "name": "The Titan Media"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://thediamonddigital.com/#website",
+          "url": "https://thediamonddigital.com",
+          "name": "Diamond Digital",
+          "description": "Digital Marketing & Software Development",
+          "publisher": {
+            "@id": "https://thediamonddigital.com/#organization"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

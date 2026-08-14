@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Code, Globe, Zap, Layers, Smartphone, LayoutTemplate, Star, Quote } from "lucide-react";
+import { useSeo } from "@/hooks/useSeo";
+import { JsonLd } from "@/components/JsonLd";
 
 const services = [
   {
@@ -104,7 +106,22 @@ function StarRow() {
 }
 
 export default function Services() {
+  useSeo({
+    title: "Software Development Services | Diamond Digital",
+    description: "Diamond Digital builds websites, web applications, mobile apps, dashboards, internal tools, automations, integrations, and custom software for businesses.",
+    canonical: "/services",
+  });
   return (
+    <>
+    <JsonLd data={{
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "serviceType": "Software Development",
+      "provider": { "@id": "https://thediamonddigital.com/#organization" },
+      "name": "Software Development Services",
+      "description": "Websites, web applications, mobile apps, dashboards, internal tools, automations, integrations, and custom software for businesses.",
+      "url": "https://thediamonddigital.com/services"
+    }} />
     <div className="pt-24 pb-32 px-6">
       <div className="container mx-auto">
         <motion.div
@@ -216,5 +233,6 @@ export default function Services() {
         </div>
       </div>
     </div>
+    </>
   );
 }

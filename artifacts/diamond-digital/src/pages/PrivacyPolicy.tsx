@@ -1,6 +1,12 @@
 import { motion } from "framer-motion";
+import { useSeo } from "@/hooks/useSeo";
 
 export default function PrivacyPolicy() {
+  useSeo({
+    title: "Privacy Policy | Diamond Digital",
+    description: "Read Diamond Digital's privacy policy to understand how we collect, use, and protect your personal information.",
+    canonical: "/privacy-policy",
+  });
   return (
     <div className="pt-[60px] pb-32 px-6">
       <div className="container mx-auto max-w-3xl">
