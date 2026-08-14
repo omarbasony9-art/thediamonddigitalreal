@@ -28,51 +28,61 @@ const services = [
     icon: Megaphone,
     title: "Paid Social Advertising",
     desc: "Meta, TikTok, LinkedIn, and Pinterest campaigns that reach the right audience and convert attention into action.",
+    features: ["Meta & TikTok Ads", "Audience targeting", "Creative testing"],
   },
   {
     icon: Target,
     title: "Google Ads / PPC",
     desc: "Search, Shopping, Display, and YouTube campaigns managed for maximum return on every dollar spent.",
+    features: ["Search & Shopping", "Conversion tracking", "Bid optimization"],
   },
   {
     icon: Share2,
     title: "Social Media Management",
     desc: "Consistent, on-brand presence across every platform — content, scheduling, community, and growth.",
+    features: ["Multi-platform posting", "Community management", "Growth strategy"],
   },
   {
     icon: FileText,
     title: "Content Creation",
     desc: "Copywriting, graphics, video, and creative assets that communicate your value and build trust with your audience.",
+    features: ["Copy & design", "Short-form video", "Brand voice"],
   },
   {
     icon: Users,
     title: "Influencer Marketing",
     desc: "Vetted creator partnerships matched to your niche, managed from outreach to reporting.",
+    features: ["Creator vetting", "End-to-end management", "ROI reporting"],
   },
   {
     icon: Mail,
     title: "Email Marketing",
     desc: "Welcome flows, nurture sequences, and broadcast campaigns that turn subscribers into customers.",
+    features: ["Automated flows", "List segmentation", "A/B testing"],
   },
   {
     icon: BarChart3,
     title: "Lead Generation",
     desc: "Funnels, landing pages, and outbound systems that fill your pipeline with qualified, ready-to-buy prospects.",
+    features: ["Funnel builds", "Landing pages", "CRM integration"],
   },
   {
     icon: TrendingUp,
     title: "SEO",
     desc: "Technical, on-page, and off-page optimization that compounds over time and drives organic revenue.",
+    features: ["Technical SEO", "Content strategy", "Link building"],
   },
   {
     icon: Palette,
     title: "Branding & Creative Strategy",
     desc: "Positioning, visual identity, and messaging frameworks that make your brand unmistakable in any market.",
+    features: ["Brand identity", "Messaging framework", "Visual guidelines"],
   },
   {
     icon: LineChart,
     title: "Marketing Analytics & Reporting",
     desc: "Clear dashboards and regular reporting that show exactly what's working, what isn't, and what to do next.",
+    features: ["Custom dashboards", "Monthly reporting", "Attribution tracking"],
   },
 ];
 
@@ -197,26 +207,49 @@ export default function DigitalMarketing() {
       </section>
 
       {/* ── SERVICES GRID ── */}
-      <section className="py-32 px-6 relative">
-        <div className="container mx-auto relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-px bg-white/5">
-            {services.map((svc, i) => (
+      <div className="pb-32 px-6">
+        <div className="container mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="max-w-3xl mb-16"
+          >
+            <h2 className="text-5xl md:text-6xl font-display font-black text-white mb-6">OUR EXPERTISE</h2>
+            <p className="text-xl text-muted-foreground leading-relaxed">
+              From paid media and social strategy to SEO, content, and analytics — Diamond Digital covers every channel of growth.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {services.map((service, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: (i % 5) * 0.07 }}
-                className="p-8 bg-background/60 hover:bg-white/[0.06] backdrop-blur-sm transition-colors group cursor-default"
+                transition={{ delay: (i % 3) * 0.1 }}
+                className="glass-panel p-8 group hover:border-primary/50 transition-colors"
               >
-                <svc.icon className="w-8 h-8 text-primary mb-5 group-hover:scale-110 transition-transform duration-300" />
-                <h3 className="text-base font-bold text-white mb-3 font-display">{svc.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{svc.desc}</p>
+                <service.icon className="w-12 h-12 text-primary mb-6 group-hover:scale-110 transition-transform" />
+                <h3 className="text-2xl font-display font-bold text-white mb-4">{service.title}</h3>
+                <p className="text-muted-foreground mb-6 line-clamp-3">{service.desc}</p>
+                <ul className="space-y-2 mb-8">
+                  {service.features.map((feature, j) => (
+                    <li key={j} className="flex items-center gap-2 text-sm text-white/80 font-mono">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="outline" className="w-full border-white/10 rounded-none font-mono group-hover:border-primary/30 group-hover:text-primary transition-colors" asChild>
+                  <a href="#quote">REQUEST SERVICE</a>
+                </Button>
               </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </div>
 
       {/* ── HOW WE WORK ── */}
       <section className="py-32 px-6">
