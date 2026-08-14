@@ -200,12 +200,6 @@ export default function DigitalMarketing() {
       <section className="py-32 px-6 bg-card border-y border-white/5 relative">
         <div className="absolute inset-0 bg-grid opacity-10 pointer-events-none" />
         <div className="container mx-auto relative z-10">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
-            <div>
-              <p className="text-xs font-mono text-primary tracking-widest mb-3 uppercase">What We Do</p>
-              <h2 className="font-display text-3xl md:text-5xl font-bold text-white">OUR SERVICES</h2>
-            </div>
-          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-px bg-white/5">
             {services.map((svc, i) => (
               <motion.div
