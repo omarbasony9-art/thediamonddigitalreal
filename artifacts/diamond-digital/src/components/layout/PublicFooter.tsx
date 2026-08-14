@@ -12,8 +12,11 @@ export function PublicFooter() {
                 DIAMOND<span className="text-primary">DIGITAL</span>
               </span>
             </Link>
-            <p className="text-muted-foreground text-sm max-w-sm leading-relaxed">
+            <p className="text-muted-foreground text-sm max-w-sm leading-relaxed mb-4">
               Precision web building. We forge digital experiences that feel like stepping into a dark crystalline universe. Crafted like a diamond, sharp and confident.
+            </p>
+            <p className="text-muted-foreground/60 text-xs font-mono">
+              Diamond Digital is a subsidiary of The Titan Media.
             </p>
           </div>
 
@@ -21,17 +24,18 @@ export function PublicFooter() {
             <h4 className="font-mono text-white mb-5 uppercase tracking-widest text-xs">Navigation</h4>
             <ul className="flex flex-col gap-3 text-sm text-muted-foreground">
               <li><Link href="/" className="hover:text-primary transition-colors">Home</Link></li>
-              <li><Link href="/services" className="hover:text-primary transition-colors">Services</Link></li>
+              <li><Link href="/digital-marketing" className="hover:text-primary transition-colors">Digital Marketing</Link></li>
+              <li><Link href="/services" className="hover:text-primary transition-colors">Software Development</Link></li>
               <li><Link href="/industries" className="hover:text-primary transition-colors">Industries</Link></li>
-              <li><Link href="/about" className="hover:text-primary transition-colors">About Us</Link></li>
+              <li><Link href="/about/digital-marketing" className="hover:text-primary transition-colors">About</Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-mono text-white mb-5 uppercase tracking-widest text-xs">Portal</h4>
+            <h4 className="font-mono text-white mb-5 uppercase tracking-widest text-xs">Legal</h4>
             <ul className="flex flex-col gap-3 text-sm text-muted-foreground">
-              <li><Link href="/sign-in" className="hover:text-primary transition-colors">Client Login</Link></li>
-              <li><Link href="/sign-up" className="hover:text-primary transition-colors">Create Account</Link></li>
+              <li><Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
         </div>
@@ -39,8 +43,8 @@ export function PublicFooter() {
         <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Diamond Digital. All rights reserved.</p>
           <div className="flex gap-5">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+            <Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

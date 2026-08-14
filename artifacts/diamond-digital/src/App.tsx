@@ -8,6 +8,8 @@ import Services from "./pages/Services";
 import DigitalMarketing from "./pages/DigitalMarketing";
 import AboutDigitalMarketing from "./pages/AboutDigitalMarketing";
 import AboutSoftwareDevelopment from "./pages/AboutSoftwareDevelopment";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import Industries from "./pages/Industries";
 import About from "./pages/About";
 import Dashboard from "./pages/admin/Dashboard";
@@ -69,6 +71,12 @@ function AppRoutes() {
           </Route>
           <Route path="/about/software-development">
             <PublicLayout><AboutSoftwareDevelopment /></PublicLayout>
+          </Route>
+          <Route path="/privacy-policy">
+            <PublicLayout><PrivacyPolicy /></PublicLayout>
+          </Route>
+          <Route path="/terms-of-service">
+            <PublicLayout><TermsOfService /></PublicLayout>
           </Route>
           <Route path="/industries">
             <PublicLayout><Industries /></PublicLayout>

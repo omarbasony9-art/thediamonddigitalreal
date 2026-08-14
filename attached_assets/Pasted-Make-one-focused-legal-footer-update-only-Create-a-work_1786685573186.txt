@@ -1,0 +1,130 @@
+Make one focused legal/footer update only.
+
+Create a working **Privacy Policy** page and a working **Terms of Service** page for the Diamond Digital website, and add both links to the footer.
+
+Requirements:
+
+* Add a footer link named `Privacy Policy`
+* Add a footer link named `Terms of Service`
+* `Privacy Policy` should open a real page at:
+  `/privacy-policy`
+* `Terms of Service` should open a real page at:
+  `/terms-of-service`
+* Direct navigation and refresh on both routes must work
+* Keep the existing Diamond Digital design, colors, typography, navbar, footer style, and responsive layout
+* Do not redesign the site
+
+### Privacy Policy page
+
+Create a professional Privacy Policy for Diamond Digital that covers:
+
+* Information users voluntarily provide
+* Contact forms and lead forms
+* Name, email, phone number, company information, and messages
+* Website usage and technical information
+* Cookies and analytics
+* Advertising and marketing technologies
+* How information is used
+* Responding to inquiries
+* Providing digital marketing and software development services
+* Marketing communications
+* Improving services and website performance
+* Security and fraud prevention
+* Third-party service providers
+* Advertising and analytics providers
+* Payment processors where applicable
+* Data retention
+* Data security
+* User privacy choices
+* Email unsubscribe rights
+* Children’s privacy
+* Third-party links/websites
+* Changes to the Privacy Policy
+* Contact information
+
+Use:
+
+`Diamond Digital`
+
+Contact email:
+
+`info@thediamonddigital.com`
+
+Include:
+
+`Last Updated: August 14, 2026`
+
+Do not claim Diamond Digital sells personal information unless the existing site actually does.
+
+### Terms of Service page
+
+Create professional Terms of Service for Diamond Digital covering:
+
+* Acceptance of terms
+* Website use
+* Digital marketing services
+* Software development services
+* Quotes and proposals
+* Client agreements
+* Payment and billing
+* Project scope
+* Scope changes
+* Client responsibilities
+* Intellectual property
+* Ownership of custom work subject to written client agreements
+* Third-party services/software
+* Marketing results are not guaranteed
+* Software results/performance are not guaranteed beyond written agreements
+* Confidentiality
+* Prohibited use
+* Disclaimer of warranties
+* Limitation of liability
+* Indemnification
+* Termination
+* Changes to these terms
+* Contact information
+
+Use:
+
+`Diamond Digital`
+
+Contact email:
+
+`info@thediamonddigital.com`
+
+Include:
+
+`Last Updated: August 14, 2026`
+
+### Parent company relationship
+
+Update the Diamond Digital footer, Privacy Policy page, and Terms of Service page to clearly state the relationship between Diamond Digital and The Titan Media.
+
+Use this exact wording:
+
+`Diamond Digital is a subsidiary of The Titan Media.`
+
+Add that exact sentence:
+
+* in the footer
+* in the Privacy Policy
+* in the Terms of Service
+
+Where appropriate on the legal pages, refer to Diamond Digital as operating under its parent company, The Titan Media.
+
+### Important constraints
+
+Do not change any unrelated design, layout, navigation, services, backend, database, authentication, admin, or other pages.
+
+Only inspect and modify:
+
+* the footer component
+* routing if required for these two pages
+* the new Privacy Policy page
+* the new Terms of Service page
+
+Do not add unnecessary dependencies.
+
+Keep agent usage low and do not inspect unrelated files.
+
+Run the frontend build after making the changes and report exactly which files changed.
