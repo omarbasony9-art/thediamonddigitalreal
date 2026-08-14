@@ -114,7 +114,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.15 }}
-            className="text-[2.4rem] xs:text-5xl md:text-7xl lg:text-[88px] font-display font-black text-white leading-[1.05] mb-4 tracking-tighter"
+            className="text-[1.85rem] xs:text-[2.35rem] md:text-[55px] lg:text-[68px] font-display font-black text-white leading-[1.05] mb-4 tracking-tighter"
           >
             MARKETING THAT GROWS.
           </motion.h1>
@@ -122,7 +122,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.25 }}
-            className="text-[2.4rem] xs:text-5xl md:text-7xl lg:text-[88px] font-display font-black leading-[1.05] mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary glow-text"
+            className="text-[1.85rem] xs:text-[2.35rem] md:text-[55px] lg:text-[68px] font-display font-black leading-[1.05] mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary glow-text"
             aria-hidden="true"
           >
             SOFTWARE THAT SCALES.
