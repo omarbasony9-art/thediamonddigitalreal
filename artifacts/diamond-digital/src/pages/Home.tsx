@@ -114,18 +114,18 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.15 }}
-            className="text-[1.85rem] xs:text-[2.35rem] md:text-[55px] lg:text-[68px] font-display font-black text-white leading-[1.05] mb-4 tracking-tighter"
+            className="text-[2rem] xs:text-[2.6rem] md:text-[4rem] lg:text-[5.5rem] font-display font-black text-white leading-[1.05] mb-4 tracking-tighter"
           >
-            MARKETING THAT GROWS.
+            MARKETING THAT<br />GROWS
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.25 }}
-            className="text-[1.85rem] xs:text-[2.35rem] md:text-[55px] lg:text-[68px] font-display font-black leading-[1.05] mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary glow-text"
+            className="text-[2rem] xs:text-[2.6rem] md:text-[4rem] lg:text-[5.5rem] font-display font-black leading-[1.05] mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary glow-text"
             aria-hidden="true"
           >
-            SOFTWARE THAT SCALES.
+            SOFTWARE THAT<br />SCALES
           </motion.p>
 
           <motion.p
