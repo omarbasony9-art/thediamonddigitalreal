@@ -35,9 +35,14 @@ export function PublicNavbar() {
             alt="Diamond Digital Logo"
             className="w-7 h-7 sm:w-8 sm:h-8 group-hover:scale-110 transition-transform duration-300"
           />
-          <span className="font-display font-bold text-base sm:text-xl tracking-wider text-white">
-            DIAMOND<span className="text-primary">DIGITAL</span>
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="font-display font-bold text-base sm:text-xl tracking-wider text-white">
+              DIAMOND<span className="text-primary">DIGITAL</span>
+            </span>
+            <span className="text-[9px] sm:text-[10px] tracking-widest text-gray-400 font-mono uppercase">
+              Digital Marketing &amp; Software Development
+            </span>
+          </div>
         </Link>
 
         {/* Desktop Nav */}
