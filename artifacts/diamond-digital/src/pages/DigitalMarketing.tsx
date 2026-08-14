@@ -197,8 +197,7 @@ export default function DigitalMarketing() {
       </section>
 
       {/* ── SERVICES GRID ── */}
-      <section className="py-32 px-6 bg-card border-y border-white/5 relative">
-        <div className="absolute inset-0 bg-grid opacity-10 pointer-events-none" />
+      <section className="py-32 px-6 relative">
         <div className="container mx-auto relative z-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-px bg-white/5">
             {services.map((svc, i) => (
@@ -208,7 +207,7 @@ export default function DigitalMarketing() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: (i % 5) * 0.07 }}
-                className="p-8 bg-background hover:bg-white/[0.03] transition-colors group cursor-default"
+                className="p-8 bg-background/60 hover:bg-white/[0.06] backdrop-blur-sm transition-colors group cursor-default"
               >
                 <svc.icon className="w-8 h-8 text-primary mb-5 group-hover:scale-110 transition-transform duration-300" />
                 <h3 className="text-base font-bold text-white mb-3 font-display">{svc.title}</h3>
