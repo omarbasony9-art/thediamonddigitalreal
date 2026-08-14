@@ -5,6 +5,7 @@ import { setAuthTokenGetter } from "@workspace/api-client-react";
 // Pages
 import Home from "./pages/Home";
 import Services from "./pages/Services";
+import DigitalMarketing from "./pages/DigitalMarketing";
 import Industries from "./pages/Industries";
 import About from "./pages/About";
 import Dashboard from "./pages/admin/Dashboard";
@@ -57,6 +58,9 @@ function AppRoutes() {
           </Route>
           <Route path="/services">
             <PublicLayout><Services /></PublicLayout>
+          </Route>
+          <Route path="/digital-marketing">
+            <PublicLayout><DigitalMarketing /></PublicLayout>
           </Route>
           <Route path="/industries">
             <PublicLayout><Industries /></PublicLayout>
