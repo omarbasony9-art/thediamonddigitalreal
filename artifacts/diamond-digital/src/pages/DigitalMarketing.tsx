@@ -132,7 +132,7 @@ export default function DigitalMarketing() {
     <div className="flex flex-col">
 
       {/* ── SERVICES GRID ── */}
-      <div className="pb-32 px-6">
+      <div className="pt-[60px] pb-32 px-6">
         <div className="container mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
